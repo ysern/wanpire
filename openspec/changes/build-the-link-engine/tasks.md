@@ -18,11 +18,11 @@
 
 ## 4. Engine (no root, recording runner)
 
-- [ ] 4.1 Failing tests: apply deletes then adds root netem, ingress, matchall redirect, ifb and its netem
-- [ ] 4.2 Failing tests: clear removes all of it and tolerates nothing to clear
-- [ ] 4.3 Failing tests: the control adapter is refused
-- [ ] 4.4 Failing tests: counters parsed from `tc -s -j qdisc show` output
-- [ ] 4.5 Implement `engine.py` until green
+- [x] 4.1 Failing tests: apply deletes then adds root netem, ingress, matchall redirect, ifb and its netem
+- [x] 4.2 Failing tests: clear removes all of it and tolerates nothing to clear
+- [x] 4.3 Failing tests: the control adapter is refused
+- [x] 4.4 Failing tests: counters parsed from `tc -s -j qdisc show` output
+- [x] 4.5 Implement `engine.py` until green
 
 ## 5. Engine in namespaces (root, Linux)
 
