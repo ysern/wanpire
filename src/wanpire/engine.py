@@ -17,7 +17,7 @@ import sys
 from collections.abc import Callable, Iterable
 
 from .model import Direction, Link
-from .netem import netem_args
+from .netem import netem_args, tbf_args
 
 DEFAULT_LINE_RATE_MBIT = 1000
 DEFAULT_LIFETIME_S = 120
@@ -149,8 +149,16 @@ class Engine:
             )
 
     def _netem(self, dev: str, d: Direction, line_rate: float) -> None:
-        self._run(["tc", "qdisc", "add", "dev", dev, "root", "netem",
+        tbf = tbf_args(d)
+        if tbf is None:
+            self._run(["tc", "qdisc", "add", "dev", dev, "root", "netem",
+                       *netem_args(d, line_rate_mbit=line_rate)])
+            return
+        # the bandwidth is a bottleneck under the delay: netem delays, tbf shapes and drops
+        self._run(["tc", "qdisc", "add", "dev", dev, "root", "handle", "1:", "netem",
                    *netem_args(d, line_rate_mbit=line_rate)])
+        self._run(["tc", "qdisc", "add", "dev", dev, "parent", "1:1", "handle", "10:", "tbf",
+                   *tbf])
 
     def _line_rate(self, adapter: str) -> float:
         try:
@@ -164,9 +172,11 @@ class Engine:
             out = self._run(["tc", "-s", "-j", "qdisc", "show", "dev", dev])
         except CommandFailed:
             return {"applied": False}
-        for q in json.loads(out or "[]"):
+        qdiscs = json.loads(out or "[]")
+        state = {"applied": False}
+        for q in qdiscs:
             if q.get("root") and q.get("kind") == "netem":
-                return {
+                state = {
                     "applied": True,
                     "packets": q.get("packets", 0),
                     "bytes": q.get("bytes", 0),
@@ -174,4 +184,11 @@ class Engine:
                     "queued": q.get("qlen", 0),
                     "limit": q.get("options", {}).get("limit"),
                 }
-        return {"applied": False}
+        if state["applied"]:
+            for q in qdiscs:
+                if q.get("kind") == "tbf":
+                    # the child's drops are counted in netem's too; netem's own are the rest
+                    state["shaper_dropped"] = q.get("drops", 0)
+                    state["dropped"] = max(0, state["dropped"] - state["shaper_dropped"])
+                    state["shaper_queued"] = q.get("qlen", 0)
+        return state

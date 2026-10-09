@@ -69,3 +69,16 @@ def test_a_link_round_trips_through_a_dict():
 def test_unknown_settings_are_refused():
     with pytest.raises(InvalidLink, match="latency"):
         Link.from_dict({"down": {"latency": 5}})
+
+
+def test_queue_ms_needs_a_bandwidth():
+    with pytest.raises(InvalidLink, match="queue_ms needs rate_mbit"):
+        Direction(queue_ms=50)
+
+
+def test_queue_ms_range():
+    with pytest.raises(InvalidLink, match="queue_ms"):
+        Direction(rate_mbit=10, queue_ms=0.5)
+    with pytest.raises(InvalidLink, match="queue_ms"):
+        Direction(rate_mbit=10, queue_ms=1001)
+    assert Direction(rate_mbit=10, queue_ms=200).queue_ms == 200

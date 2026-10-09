@@ -22,7 +22,8 @@ class Direction:
     loss_pct        random, independent loss
     burst_loss_pct  mean loss when losses come in bursts...
     burst_length    ...of this mean length, in packets
-    rate_mbit       bandwidth cap
+    rate_mbit       bandwidth, a bottleneck with a bounded queue...
+    queue_ms        ...holding at most this much at that bandwidth (default 50 ms)
     duplicate_pct   packets sent twice
     reorder_pct     packets sent ahead of their turn (needs a delay to overtake)
     """
@@ -34,6 +35,7 @@ class Direction:
     burst_loss_pct: float = 0
     burst_length: float = 0
     rate_mbit: float | None = None
+    queue_ms: float | None = None
     duplicate_pct: float = 0
     reorder_pct: float = 0
 
@@ -52,6 +54,10 @@ class Direction:
             )
         if self.rate_mbit is not None and not self.rate_mbit > 0:
             raise InvalidLink(f"rate_mbit must be positive, not {self.rate_mbit}")
+        if self.queue_ms is not None:
+            if self.rate_mbit is None:
+                raise InvalidLink("queue_ms needs rate_mbit: it is the bottleneck's queue")
+            _range("queue_ms", self.queue_ms, 1, 1000)
         if self.loss_pct and self.burst_loss_pct:
             raise InvalidLink(
                 "only one loss model may be set: loss_pct (random) or burst_loss_pct (bursts)"

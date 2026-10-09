@@ -140,6 +140,28 @@ def test_read_reports_each_direction_with_netem_drops():
     assert state["up"] == {"applied": False}
 
 
+def test_a_bandwidth_is_a_tbf_child_of_netem():
+    e, r = engine()
+    e.apply("eth1", Link(down=Direction(delay_ms=40, rate_mbit=20)))
+    assert ["tc", "qdisc", "add", "dev", "eth1", "root", "handle", "1:", "netem", "delay", "40ms",
+            "limit", "5000"] in r.calls
+    assert ["tc", "qdisc", "add", "dev", "eth1", "parent", "1:1", "handle", "10:", "tbf",
+            "rate", "20mbit", "burst", "32768", "latency", "50ms"] in r.calls
+
+
+def test_read_reports_the_shapers_drops_apart():
+    tbf = {"kind": "tbf", "handle": "10:", "parent": "1:1", "bytes": 10, "packets": 1,
+           "drops": 7, "backlog": 0, "qlen": 3}
+    # a child's drops are counted in its parent's too: netem's own are the difference
+    netem = [dict(NETEM_STATS[0], drops=9)]
+    e, r = engine({
+        ("tc", "-s", "-j", "qdisc", "show", "dev", "eth1"): json.dumps(netem + [tbf]),
+        ("tc", "-s", "-j", "qdisc", "show", "dev", "ifb-eth1"): CommandFailed(["tc"], 1, "x"),
+    })
+    down = e.read("eth1")["down"]
+    assert (down["dropped"], down["shaper_dropped"], down["shaper_queued"]) == (2, 7, 3)
+
+
 def test_read_a_default_qdisc_is_not_applied():
     e, r = engine({
         ("tc", "-s", "-j", "qdisc", "show", "dev", "eth1"): json.dumps(DEFAULT_STATS),

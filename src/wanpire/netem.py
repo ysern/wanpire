@@ -1,11 +1,14 @@
 """A Direction rendered as netem options, closing the traps the spike found. No I/O here.
 
 - Jitter defaults to a normal distribution, and keeps packets in order by setting netem's
-  ``rate`` (to the bandwidth asked, or the adapter's line rate), unless reordering is asked.
+  ``rate`` to the adapter's line rate, unless reordering is asked.
+- A bandwidth is a ``tbf`` child of netem with a bounded queue, never netem's own ``rate``,
+  whose delay-sized queue fills up with seconds of data under a single TCP flow.
 - Burst loss is the Gilbert-Elliott model; netem's loss correlation is never used (it
   produces almost no loss on the kernels measured).
 - Reordering always carries a gap (without one it does nothing).
-- The queue is sized for the delay, three jitters and the rate, with half again as margin.
+- netem's queue is sized for the delay and three jitters at the line rate, with half again as
+  margin, so that drops above the bandwidth are the bottleneck's, not netem's.
 """
 
 from __future__ import annotations
@@ -20,6 +23,9 @@ QUEUED_PACKET_MEMORY = 2048  # what one queued packet is assumed to cost in memo
 QUEUE_MEMORY_BUDGET = 64 * 1024 * 1024  # per direction
 QUEUE_MARGIN = 1.5
 REORDER_GAP = 5
+DEFAULT_QUEUE_MS = 50  # the bottleneck's queue when a bandwidth is asked
+TBF_MIN_BURST = 32 * 1024
+KERNEL_HZ = 250  # tbf needs a burst of at least one timer tick's worth of data
 
 
 def _num(x: float) -> str:
@@ -39,7 +45,7 @@ def gilbert_elliott(loss_pct: float, burst_length: float) -> tuple[float, float]
 
 
 def queue_limit(d: Direction, line_rate_mbit: float) -> int:
-    rate_mbit = d.rate_mbit or line_rate_mbit
+    rate_mbit = line_rate_mbit
     hold_s = (d.delay_ms + 3 * d.jitter_ms) / 1000
     packets_per_s = rate_mbit * 1e6 / 8 / PACKET_BYTES
     needed = math.ceil(round(QUEUE_MARGIN * hold_s * packets_per_s, 6))
@@ -63,10 +69,16 @@ def netem_args(d: Direction, line_rate_mbit: float) -> list[str]:
         a += ["duplicate", f"{_num(d.duplicate_pct)}%"]
     if d.reorder_pct:
         a += ["reorder", f"{_num(d.reorder_pct)}%", "gap", str(REORDER_GAP)]
-    rate = d.rate_mbit
-    if rate is None and d.jitter_ms and not d.reorder_pct:
-        rate = line_rate_mbit  # keeps packets in order under jitter
-    if rate is not None:
-        a += ["rate", f"{_num(rate)}mbit"]
+    if d.jitter_ms and not d.reorder_pct:
+        a += ["rate", f"{_num(line_rate_mbit)}mbit"]  # keeps packets in order under jitter
     a += ["limit", str(queue_limit(d, line_rate_mbit))]
     return a
+
+
+def tbf_args(d: Direction) -> list[str] | None:
+    """The options after ``tc qdisc add dev X parent 1:1 handle 10: tbf``, or None."""
+    if d.rate_mbit is None:
+        return None
+    burst = max(TBF_MIN_BURST, math.ceil(d.rate_mbit * 1e6 / 8 / KERNEL_HZ))
+    queue = d.queue_ms if d.queue_ms is not None else DEFAULT_QUEUE_MS
+    return ["rate", f"{_num(d.rate_mbit)}mbit", "burst", str(burst), "latency", f"{_num(queue)}ms"]

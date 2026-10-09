@@ -97,6 +97,25 @@ def test_a_long_delay_at_a_high_rate(bed):
     assert bed.read(OUTBOUND)["down"]["dropped"] == 0
 
 
+def test_one_tcp_flow_does_not_fill_a_delay_sized_queue(bed):
+    """The bandwidth is a bottleneck with a bounded queue (tbf), not netem's delay-sized one."""
+    import subprocess
+    import time
+    bed.apply(OUTBOUND, Link(down=Direction(delay_ms=40, rate_mbit=20)))
+    ns(DUT, "iperf3", "-s", "-D", "-1", "-p", "5202")
+    time.sleep(0.5)
+    pinger = subprocess.Popen(["ip", "netns", "exec", DUT, "ping", "-c", "60", "-i", "0.2",
+                               NET_IP], stdout=subprocess.PIPE, text=True)
+    out = ns(NET, "iperf3", "-c", DUT_IP, "-p", "5202", "-t", "15", "-J")
+    pings, _ = pinger.communicate(timeout=30)
+    mbit = json.loads(out)["end"]["sum_received"]["bits_per_second"] / 1e6
+    rtts = [float(line.split("time=")[1].split()[0]) for line in pings.splitlines()
+            if "time=" in line]
+    assert mbit >= 0.9 * 20
+    assert max(rtts) <= 40 + 50 + 15
+    assert bed.read(OUTBOUND)["down"]["dropped"] == 0  # drops above 20 Mbit/s are tbf's
+
+
 def test_not_renewed(bed):
     import time
     bed.apply(OUTBOUND, Link(down=Direction(delay_ms=5)), lifetime_s=5)

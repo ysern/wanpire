@@ -1,7 +1,7 @@
 import pytest
 
 from wanpire.model import Direction
-from wanpire.netem import gilbert_elliott, netem_args, queue_limit
+from wanpire.netem import gilbert_elliott, netem_args, queue_limit, tbf_args
 
 
 def opts(d, line_rate_mbit=1000):
@@ -28,9 +28,10 @@ def test_jitter_keeps_order_by_setting_a_rate():
     assert a[a.index("rate") + 1] == "1000mbit"
 
 
-def test_jitter_with_a_bandwidth_uses_the_bandwidth_as_rate():
-    a = opts(Direction(delay_ms=50, jitter_ms=10, rate_mbit=20))
-    assert a[a.index("rate") + 1] == "20mbit"
+def test_jitter_with_a_bandwidth_keeps_order_at_the_line_rate():
+    # the bandwidth is tbf's job; netem's rate only keeps order
+    a = opts(Direction(delay_ms=50, jitter_ms=10, rate_mbit=20), line_rate_mbit=1000)
+    assert a[a.index("rate") + 1] == "1000mbit"
     assert a.count("rate") == 1
 
 
@@ -82,23 +83,44 @@ def test_duplicate():
     assert a[a.index("duplicate") + 1] == "1%"
 
 
-def test_bandwidth_alone():
-    a = opts(Direction(rate_mbit=50))
-    assert a[a.index("rate") + 1] == "50mbit"
+def test_bandwidth_alone_sets_no_netem_rate():
+    assert "rate" not in opts(Direction(rate_mbit=50))
+
+
+def test_the_bandwidth_is_a_tbf_with_the_default_queue():
+    assert tbf_args(Direction(rate_mbit=20)) == ["rate", "20mbit", "burst", "32768",
+                                                  "latency", "50ms"]
+
+
+def test_the_tbf_queue_is_queue_ms():
+    assert tbf_args(Direction(rate_mbit=20, queue_ms=120))[-1] == "120ms"
+
+
+def test_the_tbf_burst_covers_one_timer_tick_at_high_rates():
+    # 1,000 Mbit/s at 250 Hz: 500,000 bytes per tick
+    assert tbf_args(Direction(rate_mbit=1000))[3] == "500000"
+
+
+def test_no_bandwidth_no_tbf():
+    assert tbf_args(Direction(delay_ms=5)) is None
 
 
 def test_queue_floor_is_1000():
     assert queue_limit(Direction(delay_ms=1), line_rate_mbit=1000) == 1000
 
 
-def test_queue_holds_the_delay_at_the_rate_with_margin():
+def test_queue_holds_the_delay_at_the_line_rate_with_margin():
     # 150 ms at 100 Mbit/s of 1,500-byte packets: 1,250 packets, x1.5 = 1,875
-    assert queue_limit(Direction(delay_ms=150, rate_mbit=100), line_rate_mbit=1000) == 1875
+    assert queue_limit(Direction(delay_ms=150), line_rate_mbit=100) == 1875
+
+
+def test_queue_ignores_the_bandwidth_which_tbf_enforces():
+    assert queue_limit(Direction(delay_ms=150, rate_mbit=20), line_rate_mbit=100) == 1875
 
 
 def test_queue_counts_three_jitters():
     # (100 + 30) ms at 100 Mbit/s: 1,083.3 packets, x1.5 -> 1,625
-    assert queue_limit(Direction(delay_ms=100, jitter_ms=10, rate_mbit=100), 1000) == 1625
+    assert queue_limit(Direction(delay_ms=100, jitter_ms=10), 100) == 1625
 
 
 def test_queue_uses_line_rate_without_bandwidth():
@@ -111,5 +133,5 @@ def test_queue_is_capped_by_the_memory_budget():
 
 
 def test_the_limit_is_in_the_options():
-    a = opts(Direction(delay_ms=150, rate_mbit=100))
+    a = opts(Direction(delay_ms=150, rate_mbit=20), line_rate_mbit=100)
     assert a[a.index("limit") + 1] == "1875"

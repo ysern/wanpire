@@ -1,9 +1,9 @@
 ## 1. The rate shaper
 
 - [x] 1.1 Measure netem's rate against tbf in namespaces on the Pi (`spikes/rate-shaper.sh`); record in design M5
-- [ ] 1.2 Failing tests: `queue_ms` validation; netem rate only at the line rate under jitter; netem queue sized at the line rate; the tbf child and its burst; counters with `shaper_dropped`
-- [ ] 1.3 Implement in `model.py`, `netem.py`, `engine.py` until green
-- [ ] 1.4 Namespace scenario: one TCP flow does not fill a delay-sized queue
+- [x] 1.2 Failing tests: `queue_ms` validation; netem rate only at the line rate under jitter; netem queue sized at the line rate; the tbf child and its burst; counters with `shaper_dropped`
+- [x] 1.3 Implement in `model.py`, `netem.py`, `engine.py` until green
+- [x] 1.4 Namespace scenario: one TCP flow does not fill a delay-sized queue
 
 ## 2. Configuration and adapters (no root)
 
