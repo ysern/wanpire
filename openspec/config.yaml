@@ -1,0 +1,49 @@
+schema: spec-driven
+
+context: |
+  wanpire is an open-source, general-purpose link emulator. A small Linux box
+  (the reference build is a Raspberry Pi 4 with Ubuntu Server 24.04 LTS) sits on
+  an Ethernet line and makes it behave like a long internet link: delay, jitter,
+  loss (also in bursts), bandwidth, reordering and duplication, set per
+  direction so a link can be asymmetric. Developers use it to test their own
+  software over a varied internet connection without leaving the desk.
+
+  A link is described by its two ends. Each end is an endpoint preset (a city,
+  its coordinates and the broadband channels available there: Generic, fibre,
+  cable, DSL, 4G, 5G, satellite and so on, never a named provider). The path
+  between the two ends comes from a city-pair table of measured figures whose
+  licence allows redistribution, and otherwise from a great-circle formula
+  calibrated against public measurements.
+
+  Stack: Python 3.12, pyroute2 for links, bridges and tc/netem, FastAPI for the
+  REST API and the web UI, the official MCP Python SDK (streamable HTTP) as a
+  thin layer over the REST API. The REST API is the engine's only interface.
+  A broker in the core hands out leases so that one agent or person drives the
+  link at a time, with a queue and TTLs. Network adapters have roles: control,
+  inbound, outbound; outbound never shares its adapter.
+
+  Two modes: a transparent bridge (devices behind it stay on the same network)
+  and a router with NAT (they get a network of their own).
+
+  Conventions:
+  - Test-first. Unit tests need no root and no network; integration tests run
+    in network namespaces with veth pairs and never touch real interfaces.
+  - Impairments are cleared at boot and by a dead-man timer.
+  - Public repository: no private hostnames, addresses, MAC addresses, SSIDs or
+    user names in code, docs or commits. Use placeholders such as
+    <pi-address> and <wifi-ssid>.
+  - No provider, vendor or trademark is named in presets or artwork.
+  - docs/build-journal.md is a chronological journal written as work happens.
+  - Decisions that are assumptions are recorded in docs/open-questions.md with
+    the options not taken.
+  - MIT licence.
+
+rules:
+  proposal:
+    - Say what is decided and what is only assumed; assumptions also go to docs/open-questions.md
+  specs:
+    - Requirements use SHALL; every requirement has at least one GIVEN/WHEN/THEN scenario
+  design:
+    - Name the options not taken and why
+  tasks:
+    - Each code task starts with its failing test

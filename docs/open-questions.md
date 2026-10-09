@@ -1,0 +1,36 @@
+# Open questions
+
+Everything still open about wanpire, and every assumption made in the owner's place.
+
+Tags: **👤 needs the owner** (money, accounts, licences, hardware in hand, publishing);
+**⚪ assumed** (decided by the agent; says what was chosen and what was not, so it can be
+reversed). Answered questions stay, marked answered.
+
+## Needs the owner
+
+| Id | Question | Options and recommendation |
+|---|---|---|
+| O1 👤 | **The USB 3 gigabit Ethernet adapter**: plugged into a blue USB 3 port, and its model, so the hardware run can measure it in bridge mode | Needed for the hardware run only; nothing else waits on it |
+| O2 👤 | **The GitHub account `wanpire` exists** (created 2023, one repository, no description). Not a project, not on PyPI or npm; the PyPI name `wanpire` is free | Keep the name; optionally reserve `wanpire` on PyPI before the first release. Recommendation: keep |
+| O3 👤 | **Ask RIPE NCC and WonderNetwork for permission to ship derived figures?** Their data may be read, not shipped (RIPE Atlas: commercial use needs prior permission, and MIT allows commercial use; WonderNetwork: "please reach out") | Not asking: they calibrate the formula only, which is what the design does now. Asking: a much wider shipped table. Recommendation: not now; the CC BY and CC0 sources suffice to start |
+| O4 👤 | **Ookla Open Data is CC BY-NC-SA 4.0**: redistributable, but not under MIT | Read only (the design's choice); or ship it as a separate, separately licensed data package. Recommendation: read only |
+
+## Assumed
+
+| Id | Assumption | Not taken |
+|---|---|---|
+| A1 ⚪ | All impairment on the outbound adapter: *down* on its egress, *up* on its ingress through an `ifb`, so the inbound adapter (which may carry control) is never touched | netem on each port's egress, which the spike measured: kept as a fallback if `ifb` costs too much |
+| A2 ⚪ | Jitter keeps packet order by default (netem `rate` set), and its default distribution is `normal`; reordering is an explicit setting | netem's defaults (uniform jitter that reorders most packets) |
+| A3 ⚪ | Burst loss uses the Gilbert-Elliott model, from a mean loss and a mean burst length; netem's loss correlation is never used (the spike found it broken) | netem's `loss p corr` |
+| A4 ⚪ | Netem's queue is sized as 1.5 × (delay + 3 × jitter) × rate / 1,500 bytes, at least 1,000, capped at 64 MB per direction | netem's fixed default of 1,000 packets |
+| A5 ⚪ | Bandwidth through netem's `rate` first; `tbf` compared in B2 | `tbf`/`htb` from the start |
+| A6 ⚪ | How two endpoints combine: delays add (path split evenly), jitters add in quadrature, losses compound, bandwidth is the narrower end | Jitters adding linearly; a per-pair table only |
+| A7 ⚪ | Formula: `2 × great-circle × route factor / 200 km per ms + router term`, route factor 1.6 to start, fitted per region pair | A single global factor |
+| A8 ⚪ | The shipped city-pair table starts from a CC BY 4.0 cloud-region table; naming that provider as a *data source* is allowed (the "no provider named" rule is about channels in presets, and CC BY requires the attribution) | Leaving that source out to avoid the name |
+| A9 ⚪ | The MCP tools call the REST API over HTTP, even in process, so one token check and one broker apply | MCP tools calling the core directly |
+| A10 ⚪ | The server runs as root under systemd, listening on the control address only, behind one bearer token generated at install | An unprivileged user with `CAP_NET_ADMIN` (later, perhaps) |
+| A11 ⚪ | The skill lives at `skills/wanpire/SKILL.md` (the plan said `skills/piwan/`, the project's earlier name) | `skills/piwan/` |
+| A12 ⚪ | The project is planned with OpenSpec's default `spec-driven` schema; decisions are recorded in each change's `design.md` (Decisions, with what was not taken) rather than in separate ADR files | A separate ADR directory |
+| A13 ⚪ | The spike's scripts are kept in the repository, in the design change's `spikes/scripts/`, so anyone can repeat the measurements | Leaving them out as throwaway code |
+| A14 ⚪ | The on-board port's test, before the second wired port exists, used router-with-NAT with a port-forward to a namespace on the box, so the workstation needed no route and no inbound firewall rule | A host route on the workstation through the box (needs administrator rights there) |
+| A15 ⚪ | Endpoint and channel figures are typical, with every figure's source in the file; the first set: London, Los Angeles, New York, Vancouver, Sydney, Mumbai, Tokyo | A larger first set |
