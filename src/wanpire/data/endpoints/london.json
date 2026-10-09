@@ -1,0 +1,305 @@
+{
+  "schema": "wanpire-endpoint/1",
+  "id": "london",
+  "name": "London",
+  "location": {
+    "lat": 51.507,
+    "lon": -0.128,
+    "country": "GB",
+    "region": "europe"
+  },
+  "default_channel": "generic",
+  "channels": {
+    "generic": {
+      "kind": "generic",
+      "description": "A typical connection in London: the median of what people there measured, whatever their kind of access",
+      "down": {
+        "delay_ms": 2.8,
+        "jitter_ms": 0.8,
+        "loss_pct": 0.1,
+        "rate_mbit": 50.9
+      },
+      "up": {
+        "delay_ms": 2.8,
+        "jitter_ms": 0.8,
+        "loss_pct": 0.1,
+        "rate_mbit": 8.9
+      },
+      "sources": [
+        {
+          "name": "M-Lab NDT city statistics: median download, upload and minimum round trip to the nearest server (delay is half that round trip)",
+          "url": "https://statistics.measurementlab.net/v0/EU/GB/GB-ENG/London/2024/histogram_daily_stats.json",
+          "date": "2024-03-26",
+          "licence": "CC0-1.0",
+          "citation": "The M-Lab NDT Data Set, 2024-01-01 to 2024-03-26, via the M-Lab statistics service. https://www.measurementlab.net/tests/ndt/"
+        },
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Jitter (30% of the access delay) and loss (0.1%): the statistics give neither."
+        }
+      ]
+    },
+    "media-private-network": {
+      "kind": "media-private-network",
+      "description": "Media-industry private network: managed studio-to-studio links, low loss, guaranteed bandwidth",
+      "down": {
+        "delay_ms": 1,
+        "jitter_ms": 0.2,
+        "loss_pct": 0.001,
+        "rate_mbit": 1000
+      },
+      "up": {
+        "delay_ms": 1,
+        "jitter_ms": 0.2,
+        "loss_pct": 0.001,
+        "rate_mbit": 1000
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "A managed service on dedicated fibre to the provider's edge in the same metro, with a committed rate: about a millisecond, almost no variation, loss close to zero."
+        }
+      ]
+    },
+    "enterprise-fibre": {
+      "kind": "enterprise-fibre",
+      "description": "Dedicated enterprise fibre line: symmetric, uncontended, one or two hops to a backbone",
+      "down": {
+        "delay_ms": 1,
+        "jitter_ms": 0.3,
+        "loss_pct": 0.01,
+        "rate_mbit": 1000
+      },
+      "up": {
+        "delay_ms": 1,
+        "jitter_ms": 0.3,
+        "loss_pct": 0.01,
+        "rate_mbit": 1000
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Uncontended point-to-point fibre: light in a few tens of kilometres of fibre plus one or two routers."
+        }
+      ]
+    },
+    "business-fibre": {
+      "kind": "business-fibre",
+      "description": "Business fibre: symmetric, lightly contended",
+      "down": {
+        "delay_ms": 2,
+        "jitter_ms": 0.5,
+        "loss_pct": 0.02,
+        "rate_mbit": 500
+      },
+      "up": {
+        "delay_ms": 2,
+        "jitter_ms": 0.5,
+        "loss_pct": 0.02,
+        "rate_mbit": 500
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Shared fibre access with a business-grade contention ratio and a symmetric plan."
+        }
+      ]
+    },
+    "consumer-fibre": {
+      "kind": "consumer-fibre",
+      "description": "Consumer fibre to the home: fast down, slower up",
+      "down": {
+        "delay_ms": 4,
+        "jitter_ms": 1,
+        "loss_pct": 0.05,
+        "rate_mbit": 500
+      },
+      "up": {
+        "delay_ms": 4,
+        "jitter_ms": 1,
+        "loss_pct": 0.05,
+        "rate_mbit": 100
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Passive optical access shared by a few dozen homes: a few milliseconds to the first major network, little variation; a typical asymmetric plan."
+        }
+      ]
+    },
+    "cable": {
+      "kind": "cable",
+      "description": "Cable broadband over coaxial lines",
+      "down": {
+        "delay_ms": 8,
+        "jitter_ms": 3,
+        "loss_pct": 0.1,
+        "rate_mbit": 300
+      },
+      "up": {
+        "delay_ms": 8,
+        "jitter_ms": 3,
+        "loss_pct": 0.1,
+        "rate_mbit": 20
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "The upstream's request-and-grant scheduling adds several milliseconds and most of the variation; upload is a small share of download."
+        }
+      ]
+    },
+    "dsl": {
+      "kind": "dsl",
+      "description": "DSL over a telephone line",
+      "down": {
+        "delay_ms": 12,
+        "jitter_ms": 3,
+        "loss_pct": 0.2,
+        "rate_mbit": 40
+      },
+      "up": {
+        "delay_ms": 12,
+        "jitter_ms": 3,
+        "loss_pct": 0.2,
+        "rate_mbit": 8
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Interleaving for error correction and the copper line's length add ten milliseconds or more; rates of a typical short-loop plan."
+        }
+      ]
+    },
+    "fixed-wireless": {
+      "kind": "fixed-wireless",
+      "description": "Fixed wireless access: a rooftop antenna to a nearby mast",
+      "down": {
+        "delay_ms": 15,
+        "jitter_ms": 6,
+        "loss_pct": 0.5,
+        "rate_mbit": 50
+      },
+      "up": {
+        "delay_ms": 15,
+        "jitter_ms": 6,
+        "loss_pct": 0.5,
+        "rate_mbit": 10
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "A shared radio channel with scheduling, more variation than a wire, and some loss in rain or interference."
+        }
+      ]
+    },
+    "mobile-4g": {
+      "kind": "mobile-4g",
+      "description": "4G mobile broadband",
+      "down": {
+        "delay_ms": 25,
+        "jitter_ms": 8,
+        "burst_loss_pct": 0.5,
+        "burst_length": 3,
+        "rate_mbit": 30
+      },
+      "up": {
+        "delay_ms": 25,
+        "jitter_ms": 8,
+        "burst_loss_pct": 0.5,
+        "burst_length": 3,
+        "rate_mbit": 8
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Radio scheduling and the mobile core add a few tens of milliseconds and much of the variation; losses the radio's retransmissions do not hide come in short bursts, at handovers and fades."
+        }
+      ]
+    },
+    "mobile-5g": {
+      "kind": "mobile-5g",
+      "description": "5G mobile broadband",
+      "down": {
+        "delay_ms": 12,
+        "jitter_ms": 5,
+        "burst_loss_pct": 0.2,
+        "burst_length": 2,
+        "rate_mbit": 200
+      },
+      "up": {
+        "delay_ms": 12,
+        "jitter_ms": 5,
+        "burst_loss_pct": 0.2,
+        "burst_length": 2,
+        "rate_mbit": 30
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Shorter radio slots than 4G halve the access delay; most deployments still share the 4G core, so not the single milliseconds of the standard's targets."
+        }
+      ]
+    },
+    "satellite-leo": {
+      "kind": "satellite-leo",
+      "description": "Low-orbit satellite broadband",
+      "down": {
+        "delay_ms": 20,
+        "jitter_ms": 8,
+        "burst_loss_pct": 1,
+        "burst_length": 5,
+        "rate_mbit": 150
+      },
+      "up": {
+        "delay_ms": 20,
+        "jitter_ms": 8,
+        "burst_loss_pct": 1,
+        "burst_length": 5,
+        "rate_mbit": 15
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "Satellites some 550 km up add only a few milliseconds of light; scheduling and the path to a ground station add the rest. Each switch to another satellite, every few tens of seconds, loses a burst of packets."
+        }
+      ]
+    },
+    "satellite-geo": {
+      "kind": "satellite-geo",
+      "description": "Geostationary satellite broadband",
+      "down": {
+        "delay_ms": 290,
+        "jitter_ms": 15,
+        "burst_loss_pct": 0.5,
+        "burst_length": 3,
+        "rate_mbit": 50
+      },
+      "up": {
+        "delay_ms": 290,
+        "jitter_ms": 15,
+        "burst_loss_pct": 0.5,
+        "burst_length": 3,
+        "rate_mbit": 5
+      },
+      "sources": [
+        {
+          "name": "wanpire's estimate for this kind of access",
+          "licence": "MIT",
+          "basis": "35,786 km up and down again is at least 239 ms each way at the speed of light; the link's scheduling and the ground station add about 50 ms."
+        }
+      ]
+    }
+  }
+}

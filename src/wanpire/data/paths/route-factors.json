@@ -1,0 +1,157 @@
+{
+ "schema": "wanpire-route-factors/1",
+ "fitted_on": "Microsoft Azure documentation, \"Azure network round-trip latency statistics\", dataset July 30, 2026 (CC-BY-4.0)",
+ "method": "tools/fit_route_factors.py: median implied factor per region pair, router term chosen on a grid; pairs under 300 km left out; region pairs with fewer than 5 pairs use the global factor",
+ "router_ms": 7.5,
+ "global_factor": 1.546,
+ "factors": {
+  "africa/east-asia": {
+   "factor": 1.815,
+   "pairs": 10
+  },
+  "africa/europe": {
+   "factor": 1.677,
+   "pairs": 38
+  },
+  "africa/middle-east": {
+   "factor": 1.584,
+   "pairs": 8
+  },
+  "africa/north-america": {
+   "factor": 1.59,
+   "pairs": 24
+  },
+  "africa/oceania": {
+   "factor": 2.598,
+   "pairs": 10
+  },
+  "africa/south-asia": {
+   "factor": 1.874,
+   "pairs": 6
+  },
+  "africa/southeast-asia": {
+   "factor": 2.046,
+   "pairs": 6
+  },
+  "east-asia/east-asia": {
+   "factor": 1.413,
+   "pairs": 10
+  },
+  "east-asia/europe": {
+   "factor": 2.401,
+   "pairs": 95
+  },
+  "east-asia/middle-east": {
+   "factor": 1.917,
+   "pairs": 20
+  },
+  "east-asia/north-america": {
+   "factor": 1.363,
+   "pairs": 60
+  },
+  "east-asia/oceania": {
+   "factor": 1.429,
+   "pairs": 25
+  },
+  "east-asia/south-america": {
+   "factor": 1.444,
+   "pairs": 5
+  },
+  "east-asia/south-asia": {
+   "factor": 1.867,
+   "pairs": 15
+  },
+  "east-asia/southeast-asia": {
+   "factor": 1.295,
+   "pairs": 15
+  },
+  "europe/europe": {
+   "factor": 1.561,
+   "pairs": 164
+  },
+  "europe/middle-east": {
+   "factor": 1.766,
+   "pairs": 76
+  },
+  "europe/north-america": {
+   "factor": 1.465,
+   "pairs": 228
+  },
+  "europe/oceania": {
+   "factor": 1.488,
+   "pairs": 95
+  },
+  "europe/south-america": {
+   "factor": 1.897,
+   "pairs": 19
+  },
+  "europe/south-asia": {
+   "factor": 1.939,
+   "pairs": 57
+  },
+  "europe/southeast-asia": {
+   "factor": 1.545,
+   "pairs": 57
+  },
+  "middle-east/middle-east": {
+   "factor": 5.265,
+   "pairs": 5
+  },
+  "middle-east/north-america": {
+   "factor": 1.471,
+   "pairs": 48
+  },
+  "middle-east/oceania": {
+   "factor": 1.397,
+   "pairs": 20
+  },
+  "middle-east/south-asia": {
+   "factor": 2.051,
+   "pairs": 12
+  },
+  "middle-east/southeast-asia": {
+   "factor": 1.419,
+   "pairs": 12
+  },
+  "north-america/north-america": {
+   "factor": 1.672,
+   "pairs": 65
+  },
+  "north-america/oceania": {
+   "factor": 1.215,
+   "pairs": 60
+  },
+  "north-america/south-america": {
+   "factor": 1.566,
+   "pairs": 12
+  },
+  "north-america/south-asia": {
+   "factor": 1.601,
+   "pairs": 36
+  },
+  "north-america/southeast-asia": {
+   "factor": 1.302,
+   "pairs": 36
+  },
+  "oceania/oceania": {
+   "factor": 1.064,
+   "pairs": 7
+  },
+  "oceania/south-america": {
+   "factor": 2.198,
+   "pairs": 5
+  },
+  "oceania/south-asia": {
+   "factor": 1.365,
+   "pairs": 15
+  },
+  "oceania/southeast-asia": {
+   "factor": 1.448,
+   "pairs": 15
+  },
+  "south-asia/southeast-asia": {
+   "factor": 1.321,
+   "pairs": 9
+  }
+ }
+}

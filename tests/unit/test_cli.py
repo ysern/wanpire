@@ -81,3 +81,48 @@ def test_clear_renew_show(fake, capsys):
 def test_netns_and_control_reach_the_engine(fake):
     cli.main(["clear", "--adapter", "o1", "--netns", "wp-box", "--control", "wlan0"])
     assert fake.made == {"netns": "wp-box", "control": {"wlan0"}}
+
+
+# -- two ends -----------------------------------------------------------------------------
+
+def test_preview_needs_no_engine(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "make_engine", lambda **k: pytest.fail("preview made an engine"))
+    assert cli.main(["preview", "london:consumer-fibre", "los-angeles:mobile-4g"]) == 0
+    out = capsys.readouterr().out
+    assert "down" in out and "up" in out and "table" in out
+
+
+def test_preview_json_is_the_link_and_its_account(capsys):
+    assert cli.main(["preview", "--json", "london", "new-york"]) == 0
+    doc = json.loads(capsys.readouterr().out)
+    assert set(doc) == {"link", "account"}
+    assert doc["account"]["path"]["origin"] == "table"
+
+
+def test_apply_from_two_ends_applies_what_preview_shows(fake, capsys):
+    from wanpire import catalogue
+    assert cli.main(["apply", "--adapter", "eth1", "london", "new-york"]) == 0
+    link, _ = catalogue.preview("london", "new-york")
+    assert fake.calls == [("apply", "eth1", link, 120)]
+
+
+def test_ends_and_raw_figures_exclude_each_other(fake, capsys):
+    assert cli.main(["apply", "--adapter", "eth1", "london", "tokyo", "--down", "delay_ms=5"]) == 2
+    assert "either" in capsys.readouterr().err
+    assert fake.calls == []
+
+
+def test_one_end_alone_is_refused(fake, capsys):
+    assert cli.main(["apply", "--adapter", "eth1", "london"]) == 2
+    assert "two ends" in capsys.readouterr().err
+
+
+def test_an_unknown_end_is_an_error(capsys):
+    assert cli.main(["preview", "atlantis", "london"]) == 2
+    assert "atlantis" in capsys.readouterr().err
+
+
+def test_endpoints_lists_the_shipped_ones_and_their_channels(capsys):
+    assert cli.main(["endpoints"]) == 0
+    out = capsys.readouterr().out
+    assert "london" in out and "mobile-4g" in out

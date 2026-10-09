@@ -414,3 +414,62 @@ the link has crashed. One detail that mattered: the timer must run on the host, 
 network namespace, so the engine keeps two runners, one for the adapter's namespace and one for
 the host. The namespace tests check both ways: not renewed, gone after its lifetime; renewed
 every two seconds, still there after ten. 77 tests pass on the Pi.
+
+## 2026-10-10 — Two ends instead of numbers
+
+The engine takes figures: 150 ms, 1% loss. Nobody thinks of a link that way. You think "my
+laptop in London on fibre, talking to someone in Los Angeles on 4G". The third change,
+`add-endpoint-presets`, makes that the way to ask:
+
+```
+$ wanpire preview london:consumer-fibre los-angeles:mobile-4g
+near  london:consumer-fibre (the device under test)
+far   los-angeles:mobile-4g
+path  142.1 ms round trip, from the table: uk-south (London) to us-west (San Francisco
+      Bay Area): 140 ms; 0 km and 560 km from the ends, corrected by +2.1 ms
+down  100 ms, +/- 8.1 ms, 0.55% loss in bursts of 3, 8 Mbit/s
+up    100 ms, +/- 8.1 ms, 0.55% loss in bursts of 3, 30 Mbit/s
+```
+
+An **endpoint** is a JSON file (with a published schema): a city, its coordinates, and its
+**channels**, the kinds of access you can have there: generic, fibre, cable, DSL, 4G, 5G,
+two kinds of satellite, a studio-grade private network. No provider is ever named. The link
+is the path between the two cities plus each end's channel: delays add, jitters add in
+quadrature, losses compound, and the bandwidth is the narrower end's.
+
+### Where the path comes from
+
+The rule from the start: only figures whose licence allows us to ship them. One cloud
+provider publishes the median round trip between its ~54 data-centre regions, measured every
+minute, in a documentation repository licensed CC BY 4.0. That is 2,862 directional figures,
+shipped with their attribution, and rebuilt by a script from the page's own CSV.
+
+A city is anchored at its nearest data-centre site, if one is within 1,000 km, and the
+table's figure is nudged by the difference the distance makes. Everywhere else, a formula:
+
+    rtt = 2 × great-circle km × route factor / 200 km per ms + router term
+
+### Fitting the formula, and publishing how wrong it is
+
+The design's first guess (one factor of 1.6, no router term) was off by a median of 14.5%
+against the table. Fitting a factor per pair of world regions and a router term (7.5 ms)
+brought it to 6.7%. The honest figure is the one with each site *held out* of the fit and then
+predicted, because that is how the formula is used, for places the table lacks: **8.9%**
+median, 23% at the 90th percentile. All 1,419 pairs and their errors are in the repository.
+
+The data taught two things. First, Europe to "east Asia" was a mess (19.5% median error) until
+south-east Asia became a region of its own: Europe reaches Singapore by the straight route
+through the Red Sea, and Tokyo or Seoul by long ones. Second, a formula cannot know a route:
+São Paulo to Cape Town is 6,300 km, but this backbone does not use the South Atlantic cable,
+so the measured round trip is 304 ms against the formula's 106. That is what the table is for.
+
+### Access figures
+
+For each city's *generic* channel, M-Lab's NDT statistics (CC0): the median download, upload
+and minimum round trip people in that city measured to their nearest test server, January to
+March 2024. London: 51 Mbit/s down, 9 up, 5.6 ms. Mumbai: 29 down, 12 up. The other kinds are
+our own typical figures, written down with the reasoning behind each, such as the
+geostationary satellite's 290 ms each way: 35,786 km up and down again is 239 ms at the speed
+of light before anything else happens.
+
+110 unit tests, all without root, pass on the laptop and on the Pi.

@@ -14,16 +14,19 @@ controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports sho
 
 ## Status
 
-Early. The engine and its command line work; presets, the web UI, the REST API and the MCP do not exist yet. What there is:
+Early. The engine, the endpoint presets and a command line work; the web UI, the REST API and the MCP do not exist yet. What there is:
 
 - the design and the first measurements: [`openspec/changes/design-the-link-emulator/`](openspec/changes/design-the-link-emulator/)
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
 - what is assumed and what is still open: [`docs/open-questions.md`](docs/open-questions.md)
 
-What works today, on Linux as root: the engine and a command line, on raw figures.
+What works today: a link described by its two ends, or by raw figures, applied on Linux as root.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
+.venv/bin/wanpire endpoints                                    # the shipped cities and their channels
+.venv/bin/wanpire preview london:consumer-fibre los-angeles:mobile-4g   # no root needed
+sudo .venv/bin/wanpire apply --adapter <outbound> london:consumer-fibre los-angeles:mobile-4g
 sudo .venv/bin/wanpire apply --adapter <outbound> --down delay_ms=150,jitter_ms=5 --up delay_ms=150,loss_pct=1
 sudo .venv/bin/wanpire show  --adapter <outbound>
 sudo .venv/bin/wanpire clear --adapter <outbound>
@@ -36,6 +39,21 @@ in network namespaces, `sudo .venv/bin/python -m pytest tests/netns`.
 The project is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec):
 `openspec/specs/` says what must be true, `openspec/changes/` holds the work in progress.
 
+An end is `<endpoint>[:<channel>]`, where `<endpoint>` is a shipped city or your own preset
+file (schema: [`src/wanpire/data/schema/endpoint.schema.json`](src/wanpire/data/schema/endpoint.schema.json)).
+The first is where your device under test is.
+
+## Data and its sources
+
+- **Paths between cities**: round-trip figures from "Azure network round-trip latency
+  statistics", Microsoft, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
+  wanpire maps the regions to approximate coordinates and re-shapes the matrix
+  ([`tools/import_backbone_rtt.py`](tools/import_backbone_rtt.py)).
+- **Elsewhere, a formula** fitted on those figures; its error, pair by pair, is in
+  [`docs/route-factor-fit.md`](docs/route-factor-fit.md).
+- **Each city's generic access**: the M-Lab NDT Data Set (CC0), via the M-Lab statistics service.
+- **The other kinds of access** are wanpire's own estimates, with their reasoning in each file.
+
 ## Licence
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). The data above keeps its own licence.
