@@ -126,3 +126,64 @@ def test_endpoints_lists_the_shipped_ones_and_their_channels(capsys):
     assert cli.main(["endpoints"]) == 0
     out = capsys.readouterr().out
     assert "london" in out and "mobile-4g" in out
+
+
+# -- adapters and modes -------------------------------------------------------------------
+
+from wanpire.adapters import Adapter  # noqa: E402
+
+ADAPTERS = [Adapter("eth0", "ethernet", "aa:bb:cc:dd:ee:01", "up", 1000, False),
+            Adapter("eth1", "usb-ethernet", "aa:bb:cc:dd:ee:02", "up", 1000, False),
+            Adapter("wlan0", "wifi", "aa:bb:cc:dd:ee:03", "up", None, True)]
+
+
+@pytest.fixture
+def box(monkeypatch, tmp_path):
+    cfg = tmp_path / "wanpire.json"
+    cfg.write_text(json.dumps({"schema": "wanpire-config/1", "mode": "bridge",
+                               "adapters": {"control": "wlan0", "inbound": "eth0",
+                                            "outbound": ["eth1"]}}))
+    calls = []
+
+    class FakeModes:
+        def up(self, c):
+            calls.append(("up", c.mode))
+
+        def down(self, c):
+            calls.append(("down", c.mode))
+
+    monkeypatch.setattr(cli, "list_adapters", lambda: ADAPTERS)
+    monkeypatch.setattr(cli, "make_modes", lambda: FakeModes())
+    return str(cfg), calls
+
+
+def test_adapters_lists_roles(box, capsys):
+    path, _ = box
+    assert cli.main(["adapters", "--config", path, "--json"]) == 0
+    rows = {a["name"]: a for a in json.loads(capsys.readouterr().out)}
+    assert rows["eth1"]["role"] == "outbound" and rows["eth1"]["kind"] == "usb-ethernet"
+    assert rows["wlan0"]["can_be_ap"] is True
+
+
+def test_adapters_without_a_configuration(monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(cli, "list_adapters", lambda: ADAPTERS)
+    assert cli.main(["adapters", "--config", str(tmp_path / "none.json")]) == 0
+    assert "eth0" in capsys.readouterr().out
+
+
+def test_up_and_down(box):
+    path, calls = box
+    assert cli.main(["up", "--config", path]) == 0
+    assert cli.main(["down", "--config", path]) == 0
+    assert calls == [("up", "bridge"), ("down", "bridge")]
+
+
+def test_up_refuses_an_invalid_mapping(box, capsys, tmp_path):
+    _, calls = box
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"schema": "wanpire-config/1", "mode": "bridge",
+                               "adapters": {"control": "wlan0", "inbound": "eth0",
+                                            "outbound": ["eth0"]}}))
+    assert cli.main(["up", "--config", str(bad)]) == 2
+    assert "outbound shares its adapter with nothing" in capsys.readouterr().err
+    assert calls == []

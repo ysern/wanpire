@@ -7,16 +7,16 @@
 
 ## 2. Configuration and adapters (no root)
 
-- [ ] 2.1 Failing tests: each scenario of `adapter-roles` on a fixed adapter list
-- [ ] 2.2 Failing tests: the adapter list from a fake sysfs tree and a recorded `iw`
-- [ ] 2.3 Implement `config.py` and `adapters.py` until green
+- [x] 2.1 Failing tests: each scenario of `adapter-roles` on a fixed adapter list
+- [x] 2.2 Failing tests: the adapter list from a fake sysfs tree and a recorded `iw`
+- [x] 2.3 Implement `config.py` and `adapters.py` until green
 
 ## 3. Modes (root, namespaces)
 
-- [ ] 3.1 Namespace scenarios of `line-modes`: bridge reach, port with an address, teardown; router DHCP, NAT source, forwarding restored, twice
-- [ ] 3.2 Implement `modes.py` until green on the Pi
+- [x] 3.1 Namespace scenarios of `line-modes`: bridge reach, port with an address, teardown; router DHCP, NAT source, forwarding restored, twice
+- [x] 3.2 Implement `modes.py` until green on the Pi
 
 ## 4. CLI and close
 
-- [ ] 4.1 `wanpire adapters`, `wanpire up`, `wanpire down`, with tests
-- [ ] 4.2 Journal, open questions, README
+- [x] 4.1 `wanpire adapters`, `wanpire up`, `wanpire down`, with tests
+- [x] 4.2 Journal, open questions, README

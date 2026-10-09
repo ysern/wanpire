@@ -473,3 +473,42 @@ geostationary satellite's 290 ms each way: 35,786 km up and down again is 239 ms
 of light before anything else happens.
 
 110 unit tests, all without root, pass on the laptop and on the Pi.
+
+## 2026-10-10 — Putting the box on the line: bridge or router
+
+Two ways to sit on a cable. As a **bridge**, the box is invisible: the two ports are joined,
+neither has an address, and the device behind it stays on the same network as before. As a
+**router with NAT**, the device gets a network of its own, an address from the box's DHCP
+server, and leaves through the box's address, like behind a home router; that is the mode for
+testing anything that cares about NAT.
+
+Which port does what lives in one small JSON file: *control* (where wanpire is driven from),
+*inbound* (towards the wider network), *outbound* (towards the device). One rule matters more
+than the rest: **outbound shares its port with nothing**, because every impairment lives on
+it. A file that breaks it is refused with that sentence.
+
+Both modes are built with pyroute2 (bridges, addresses), one nftables table of wanpire's own
+(the NAT), and dnsmasq (DHCP), and tested with real packets in network namespaces on the Pi:
+the device pings across the bridge; in router mode it gets an address by DHCP, and the far
+side sees the box's address as the sender. Tearing down puts IP forwarding back to what it was.
+All seven passed on the first run.
+
+### netem's rate is not a bottleneck
+
+The design left one question open: shape bandwidth with netem's own `rate`, or with a separate
+token bucket (`tbf`)? Measured on the Pi: 40 ms of delay, 20 Mbit/s, one TCP download, and a
+ping running alongside.
+
+| Shaper | Download | Ping under load (avg / max) |
+|---|---|---|
+| netem `rate` | 18.9 Mbit/s | 372 / 718 ms |
+| `tbf`, 20 ms queue | 19.0 Mbit/s | 62 / 72 ms |
+| `tbf`, 100 ms queue | 18.9 Mbit/s | 126 / 151 ms |
+
+Same speed, very different line. netem holds as many packets as its queue allows, and the
+queue has to be long enough for the delay at full line rate, so at 20 Mbit/s one TCP flow piles
+up most of a second of data in it. A real access link has a buffer of tens of milliseconds and
+drops beyond it. So bandwidth is now a `tbf` under the netem delay, with its queue as a setting
+(`queue_ms`, 50 ms by default), and the counters tell the bottleneck's drops from wanpire's own.
+(One trap on the way: the kernel counts a child queue's drops in its parent's too, so netem's
+"dropped" included the bottleneck's until the engine subtracted them.)

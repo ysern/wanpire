@@ -1,5 +1,8 @@
 """wanpire's command line: apply, show, renew and clear a link on an adapter.
 
+    wanpire adapters
+    wanpire up                       (the mode in /etc/wanpire/wanpire.json)
+    wanpire down
     wanpire endpoints
     wanpire preview london:consumer-fibre los-angeles:mobile-4g
     wanpire apply --adapter eth1 london:consumer-fibre los-angeles:mobile-4g
@@ -18,6 +21,8 @@ import sys
 from dataclasses import fields
 
 from . import catalogue
+from .adapters import list_adapters
+from .config import DEFAULT_PATH, InvalidConfig, load_config
 from .engine import DEFAULT_LIFETIME_S, CommandFailed, Engine, RefusedAdapter
 from .model import Direction, InvalidLink, Link
 from .presets import InvalidPreset
@@ -27,6 +32,11 @@ _TEXT = {"distribution"}
 
 def make_engine(netns: str | None = None, control=()) -> Engine:
     return Engine(netns=netns, control_adapters=control)
+
+
+def make_modes():
+    from .modes import Modes
+    return Modes()
 
 
 def _settings(text: str) -> dict:
@@ -45,6 +55,13 @@ def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="wanpire", description="Make a line behave like a long link.")
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("endpoints", help="list the shipped endpoints and their channels")
+    ad = sub.add_parser("adapters", help="list the network adapters and their roles")
+    ad.add_argument("--config", default=DEFAULT_PATH)
+    ad.add_argument("--json", action="store_true", help="print JSON")
+    for name, text in (("up", "set up the configured mode (bridge or router)"),
+                       ("down", "tear down whatever either mode set up")):
+        m = sub.add_parser(name, help=text)
+        m.add_argument("--config", default=DEFAULT_PATH)
     pv = sub.add_parser("preview", help="work out the link between two ends; changes nothing")
     pv.add_argument("near", help="the device under test's end: <endpoint>[:<channel>]")
     pv.add_argument("far", help="the other end: <endpoint>[:<channel>]")
@@ -73,6 +90,14 @@ def main(argv: list[str] | None = None) -> int:
         if a.command == "endpoints":
             _print_endpoints()
             return 0
+        if a.command == "adapters":
+            _print_adapters(a.config, a.json)
+            return 0
+        if a.command in ("up", "down"):
+            adapters = {x.name: x for x in list_adapters()}
+            cfg = load_config(a.config, adapters)
+            getattr(make_modes(), a.command)(cfg)
+            return 0
         if a.command == "preview":
             link, account = catalogue.preview(a.near, a.far)
             if a.json:
@@ -91,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             engine.clear(a.adapter)
         elif a.command == "show":
             print(json.dumps(engine.read(a.adapter), indent=2))
-    except (InvalidLink, InvalidPreset, RefusedAdapter, ValueError) as e:
+    except (InvalidLink, InvalidPreset, InvalidConfig, RefusedAdapter, ValueError) as e:
         print(f"wanpire: {e}", file=sys.stderr)
         return 2
     except CommandFailed as e:
@@ -112,6 +137,27 @@ def _link_to_apply(a) -> Link:
         with open(a.file, encoding="utf-8") as f:
             return Link.from_dict(json.load(f))
     return Link(down=Direction(**_settings(a.down)), up=Direction(**_settings(a.up)))
+
+
+def _print_adapters(config_path: str, as_json: bool) -> None:
+    adapters = list_adapters()
+    try:
+        cfg = load_config(config_path, {x.name: x for x in adapters})
+        role = cfg.role
+    except InvalidConfig as e:
+        print(f"wanpire: no roles: {e}", file=sys.stderr)
+
+        def role(_name):
+            return None
+    rows = [dict(x.to_dict(), role=role(x.name)) for x in adapters]
+    if as_json:
+        print(json.dumps(rows, indent=2))
+        return
+    for r in rows:
+        speed = f"{r['speed_mbit']} Mbit/s" if r["speed_mbit"] else "-"
+        ap = "AP" if r["can_be_ap"] else ""
+        print(f"{r['name']:<16} {r['kind']:<13} {r['mac']:<18} {r['state']:<8} {speed:<12} "
+              f"{ap:<3} {r['role'] or ''}")
 
 
 def _print_endpoints() -> None:

@@ -32,6 +32,20 @@ sudo .venv/bin/wanpire show  --adapter <outbound>
 sudo .venv/bin/wanpire clear --adapter <outbound>
 ```
 
+The box sits on the line as a transparent bridge or as a router with NAT, set in
+`/etc/wanpire/wanpire.json`:
+
+```json
+{"schema": "wanpire-config/1", "mode": "bridge",
+ "adapters": {"control": "wlan0", "inbound": "eth0", "outbound": ["eth1"]}}
+```
+
+```sh
+.venv/bin/wanpire adapters          # every adapter, its kind and its role
+sudo .venv/bin/wanpire up           # set up the configured mode
+sudo .venv/bin/wanpire down         # and take it off again
+```
+
 A link is cleared by itself after two minutes unless renewed (`wanpire renew`), so a
 forgotten one never lingers. Tests: `.venv/bin/pytest` (no root needed), and with real packets
 in network namespaces, `sudo .venv/bin/python -m pytest tests/netns`.
