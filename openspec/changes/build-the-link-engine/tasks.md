@@ -33,6 +33,6 @@
 
 ## 6. Dead-man and CLI
 
-- [ ] 6.1 Failing tests: apply with a lifetime arms the timer; renew re-arms; clear stops it
-- [ ] 6.2 Implement; namespace test for "Not renewed" and "Renewed"
-- [ ] 6.3 `wanpire apply|show|clear` on raw figures, with tests
+- [x] 6.1 Failing tests: apply with a lifetime arms the timer; renew re-arms; clear stops it
+- [x] 6.2 Implement; namespace test for "Not renewed" and "Renewed"
+- [x] 6.3 `wanpire apply|show|clear` on raw figures, with tests

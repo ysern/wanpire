@@ -403,3 +403,14 @@ under two minutes, first time. Figures from that bed:
 
 The `ifb` detour for the up direction costs about 11% of throughput on the Pi, at a rate far
 above anything wanpire is for.
+
+### The dead-man
+
+A forgotten impairment is the worst failure a link emulator has: somebody's video call is
+slow for a day and nobody knows why. Every `apply` therefore arms a **transient systemd
+timer** that runs `wanpire clear` when the link's lifetime (two minutes by default) runs out;
+`wanpire renew` pushes it back. Being a systemd unit, it fires even if the program that applied
+the link has crashed. One detail that mattered: the timer must run on the host, not inside the
+network namespace, so the engine keeps two runners, one for the adapter's namespace and one for
+the host. The namespace tests check both ways: not renewed, gone after its lifetime; renewed
+every two seconds, still there after ten. 77 tests pass on the Pi.

@@ -95,3 +95,21 @@ def test_a_long_delay_at_a_high_rate(bed):
     time.sleep(0.5)
     ns(NET, "iperf3", "-c", DUT_IP, "-u", "-b", "95M", "-l", "1400", "-t", "15")
     assert bed.read(OUTBOUND)["down"]["dropped"] == 0
+
+
+def test_not_renewed(bed):
+    import time
+    bed.apply(OUTBOUND, Link(down=Direction(delay_ms=5)), lifetime_s=5)
+    assert bed.read(OUTBOUND)["down"]["applied"]
+    time.sleep(7)
+    assert not bed.read(OUTBOUND)["down"]["applied"]
+
+
+def test_renewed(bed):
+    import time
+    bed.apply(OUTBOUND, Link(down=Direction(delay_ms=5)), lifetime_s=5)
+    for _ in range(5):
+        time.sleep(2)
+        bed.renew(OUTBOUND, lifetime_s=5)
+    assert bed.read(OUTBOUND)["down"]["applied"]
+    bed.clear(OUTBOUND)

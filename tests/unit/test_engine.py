@@ -146,3 +146,65 @@ def test_read_a_default_qdisc_is_not_applied():
         ("tc", "-s", "-j", "qdisc", "show", "dev", "ifb-eth1"): CommandFailed(["tc"], 1, "x"),
     })
     assert e.read("eth1")["down"] == {"applied": False}
+
+
+# -- the dead-man ------------------------------------------------------------------------
+
+
+def timer_calls(r):
+    return [c for c in r.calls if c and c[0] in ("systemd-run", "systemctl")]
+
+
+def test_apply_arms_a_dead_man_with_the_default_lifetime():
+    e, r = engine()
+    e.apply("eth1", Link(down=Direction(delay_ms=5)))
+    run = next(c for c in r.calls if c[0] == "systemd-run")
+    assert "--unit=wanpire-deadman-eth1" in run
+    assert "--on-active=120s" in run
+    tail = run[run.index("--") + 1:]
+    assert tail[1:] == ["-m", "wanpire.cli", "clear", "--adapter", "eth1"]
+
+
+def test_the_dead_man_is_armed_after_the_link_is_in_place():
+    e, r = engine()
+    e.apply("eth1", Link(down=Direction(delay_ms=5)))
+    i_add = max(i for i, c in enumerate(r.calls) if c[:3] == ["tc", "qdisc", "add"])
+    i_arm = next(i for i, c in enumerate(r.calls) if c[0] == "systemd-run")
+    assert i_arm > i_add
+
+
+def test_a_lifetime_can_be_given_and_names_the_namespace():
+    r = FakeRunner(speed(1000))
+    e = Engine(runner=r, netns="wp-box")
+    e.apply("eth1", Link(down=Direction(delay_ms=5)), lifetime_s=5)
+    run = next(c for c in r.calls if c[0] == "systemd-run")
+    assert "--on-active=5s" in run
+    assert run[-2:] == ["--netns", "wp-box"]
+
+
+def test_no_lifetime_arms_nothing():
+    e, r = engine()
+    e.apply("eth1", Link(down=Direction(delay_ms=5)), lifetime_s=None)
+    assert not any(c[0] == "systemd-run" for c in r.calls)
+
+
+def test_renew_rearms_the_timer():
+    e, r = engine()
+    e.renew("eth1", lifetime_s=30)
+    t = timer_calls(r)
+    assert t[0] == ["systemctl", "stop", "wanpire-deadman-eth1.timer"]
+    assert t[-1][0] == "systemd-run" and "--on-active=30s" in t[-1]
+
+
+def test_clear_stops_the_timer_first():
+    e, r = engine()
+    e.clear("eth1")
+    assert r.calls[0] == ["systemctl", "stop", "wanpire-deadman-eth1.timer"]
+
+
+def test_the_dead_man_runs_on_the_host_not_in_the_namespace():
+    inner, host = FakeRunner(speed(1000)), FakeRunner()
+    e = Engine(runner=inner, host_runner=host, netns="wp-box")
+    e.apply("eth1", Link(down=Direction(delay_ms=5)), lifetime_s=5)
+    assert any(c[0] == "systemd-run" for c in host.calls)
+    assert not any(c[0] in ("systemd-run", "systemctl") for c in inner.calls)

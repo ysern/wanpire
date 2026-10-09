@@ -13,12 +13,14 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+import sys
 from collections.abc import Callable, Iterable
 
 from .model import Direction, Link
 from .netem import netem_args
 
 DEFAULT_LINE_RATE_MBIT = 1000
+DEFAULT_LIFETIME_S = 120
 IFNAMSIZ = 15
 
 
@@ -57,16 +59,28 @@ class Engine:
         runner: Runner | None = None,
         control_adapters: Iterable[str] = (),
         netns: str | None = None,
+        host_runner: Runner | None = None,
     ):
+        """``runner`` runs commands where the adapter lives (inside ``netns`` if one is
+        named); ``host_runner`` runs the dead-man's systemd commands, always on the host."""
         if runner is None:
             runner = lambda argv, check=True: run(argv, check=check, netns=netns)  # noqa: E731
+            host_runner = host_runner or run
         self._run = runner
+        self._host = host_runner or runner
+        self._netns = netns
         self._control = set(control_adapters)
 
     # -- public ---------------------------------------------------------------
 
-    def apply(self, adapter: str, link: Link) -> None:
-        """Replace whatever the adapter carries with ``link``."""
+    def apply(
+        self, adapter: str, link: Link, lifetime_s: float | None = DEFAULT_LIFETIME_S
+    ) -> None:
+        """Replace whatever the adapter carries with ``link``.
+
+        With a lifetime, a dead-man clears the link when it runs out unless ``renew`` is
+        called; it is a systemd timer, so it outlives this process.
+        """
         self._refuse_control(adapter)
         self.clear(adapter)
         try:
@@ -85,10 +99,18 @@ class Engine:
         except Exception:
             self.clear(adapter)
             raise
+        if lifetime_s:
+            self._arm(adapter, lifetime_s)
+
+    def renew(self, adapter: str, lifetime_s: float = DEFAULT_LIFETIME_S) -> None:
+        """Push the dead-man's deadline to ``lifetime_s`` from now."""
+        self._refuse_control(adapter)
+        self._arm(adapter, lifetime_s)
 
     def clear(self, adapter: str) -> None:
         """Remove everything the engine adds. Succeeds when there is nothing to remove."""
         self._refuse_control(adapter)
+        self._disarm(adapter)
         self._run(["tc", "qdisc", "del", "dev", adapter, "root"], check=False)
         self._run(["tc", "qdisc", "del", "dev", adapter, "ingress"], check=False)
         self._run(["ip", "link", "del", ifb_name(adapter)], check=False)
@@ -101,6 +123,24 @@ class Engine:
         }
 
     # -- inside ---------------------------------------------------------------
+
+    @staticmethod
+    def _unit(adapter: str) -> str:
+        return f"wanpire-deadman-{adapter}"
+
+    def _disarm(self, adapter: str) -> None:
+        self._host(["systemctl", "stop", f"{self._unit(adapter)}.timer"], check=False)
+
+    def _arm(self, adapter: str, lifetime_s: float) -> None:
+        self._disarm(adapter)
+        # A finished or failed run of the previous dead-man would block the unit name.
+        self._host(["systemctl", "reset-failed", f"{self._unit(adapter)}.service"], check=False)
+        argv = ["systemd-run", f"--unit={self._unit(adapter)}", f"--on-active={lifetime_s:g}s",
+                "--timer-property=AccuracySec=100ms", "--",
+                sys.executable, "-m", "wanpire.cli", "clear", "--adapter", adapter]
+        if self._netns:
+            argv += ["--netns", self._netns]
+        self._host(argv)
 
     def _refuse_control(self, adapter: str) -> None:
         if adapter in self._control:

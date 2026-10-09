@@ -20,6 +20,19 @@ Early design. Nothing is usable yet. What exists:
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
 - what is assumed and what is still open: [`docs/open-questions.md`](docs/open-questions.md)
 
+What works today, on Linux as root: the engine and a command line, on raw figures.
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
+sudo .venv/bin/wanpire apply --adapter <outbound> --down delay_ms=150,jitter_ms=5 --up delay_ms=150,loss_pct=1
+sudo .venv/bin/wanpire show  --adapter <outbound>
+sudo .venv/bin/wanpire clear --adapter <outbound>
+```
+
+A link is cleared by itself after two minutes unless renewed (`wanpire renew`), so a
+forgotten one never lingers. Tests: `.venv/bin/pytest` (no root needed), and with real packets
+in network namespaces, `sudo .venv/bin/python -m pytest tests/netns`.
+
 The project is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec):
 `openspec/specs/` says what must be true, `openspec/changes/` holds the work in progress.
 
