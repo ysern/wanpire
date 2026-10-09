@@ -14,7 +14,7 @@ controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports sho
 
 ## Status
 
-Early design. Nothing is usable yet. What exists:
+Early. The engine and its command line work; presets, the web UI, the REST API and the MCP do not exist yet. What there is:
 
 - the design and the first measurements: [`openspec/changes/design-the-link-emulator/`](openspec/changes/design-the-link-emulator/)
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
