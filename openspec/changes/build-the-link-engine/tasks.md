@@ -26,10 +26,10 @@
 
 ## 5. Engine in namespaces (root, Linux)
 
-- [ ] 5.1 A pytest fixture building the spike's three-namespace bed, torn down whatever happens
-- [ ] 5.2 Scenarios of `link-engine`: delay each way, replace, clear, counters
-- [ ] 5.3 Scenarios of `link-model` that need packets: jitter keeps order, burst loss, queue long enough
-- [ ] 5.4 Run on the Pi; record figures in the build journal
+- [x] 5.1 A pytest fixture building the spike's three-namespace bed, torn down whatever happens
+- [x] 5.2 Scenarios of `link-engine`: delay each way, replace, clear, counters
+- [x] 5.3 Scenarios of `link-model` that need packets: jitter keeps order, burst loss, queue long enough
+- [x] 5.4 Run on the Pi; record figures in the build journal
 
 ## 6. Dead-man and CLI
 

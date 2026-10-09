@@ -364,3 +364,42 @@ table; the rest may only calibrate the formula. What I found:
 First sanity check of the formula: London to the US West coast is about 8,630 km on the great
 circle; light in fibre would take 86 ms there and back; the published figure is 140 ms. A route
 factor of about 1.6, which is in line with what is usually quoted for intercontinental paths.
+
+## 2026-10-10 — The engine, test-first
+
+The second change, `build-the-link-engine`, starts with its requirements written as
+scenarios (`openspec/changes/build-the-link-engine/specs/`), then tests, then code.
+
+**A library gap decided one thing.** The plan was pyroute2 for everything netlink. Its netem
+support (0.9.6) leaves out the delay distribution table and the loss models, so it cannot
+express normal jitter or Gilbert-Elliott loss, the two things the spike said we must use. The
+engine therefore builds `tc` argument lists (a pure function, testable on any laptop) and runs
+them; pyroute2 stays for adapters and bridges.
+
+What the engine does, in the order it was tested:
+
+1. **The model** (`model.py`): two directions, each with delay, jitter and its distribution,
+   random or burst loss, bandwidth, duplication and reordering; refusals that name the setting
+   and its range.
+2. **netem's options** (`netem.py`): normal jitter by default; `rate` set under jitter so
+   packets keep their order; burst loss as Gilbert-Elliott from two human figures (mean loss,
+   mean burst length: `r = 1/B`, `p = L·r/(1−L)`); a reorder gap always; the queue sized as
+   1.5 × (delay + 3 jitters) × rate, at least 1,000 packets, at most 64 MB.
+3. **The engine** (`engine.py`): *down* on the outbound adapter's egress; *up* on its ingress,
+   redirected (`matchall` + `mirred`) to an `ifb` device with its own netem. Every apply clears
+   first, so nothing lingers. Counters come from `tc -s -j` (JSON).
+
+51 unit tests run in a third of a second without root. Then the same scenarios with real
+packets, in namespaces on the Pi (`sudo .venv/bin/python -m pytest tests/netns`): 10 passed in
+under two minutes, first time. Figures from that bed:
+
+```
+50 ms each way                         round trip +100.048 ms
+10 ms jitter one way, order kept       spread 10.07 ms, 0 of 10,000 out of order
+3% loss in bursts of 3                 2.94% lost, mean burst 2.7, longest 12
+150 ms down (egress netem)             418 Mbit/s through, engine dropped 0
+150 ms up (ingress via ifb)            373 Mbit/s through, engine dropped 0
+```
+
+The `ifb` detour for the up direction costs about 11% of throughput on the Pi, at a rate far
+above anything wanpire is for.
