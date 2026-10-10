@@ -81,7 +81,8 @@ def _read_password(confirm: bool) -> str:
         if confirm and getpass.getpass("Again: ") != first:
             raise InvalidAccount("the two passwords differ")
         return first
-    return sys.stdin.readline().rstrip("\r\n")
+    # a BOM is what PowerShell puts before text piped into ssh; never part of a password
+    return sys.stdin.readline().rstrip("\r\n").lstrip("﻿")
 
 
 def _account(a) -> int:

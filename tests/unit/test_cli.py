@@ -221,6 +221,17 @@ def test_account_set_reads_the_password_from_stdin(tmp_path, monkeypatch, capsys
     assert "correct horse" not in capsys.readouterr().out
 
 
+def test_account_set_ignores_a_byte_order_mark(tmp_path, monkeypatch):
+    # PowerShell piping into ssh puts a UTF-8 BOM before the text, and \r\n after it
+    import io
+
+    from wanpire.account import Account
+    p = tmp_path / "account"
+    monkeypatch.setattr("sys.stdin", io.StringIO("﻿correct horse\r\n"))
+    assert cli.main(["account", "set", "admin", "--file", str(p)]) == 0
+    assert Account(p).verify("admin", "correct horse")
+
+
 def test_account_set_refuses_a_short_password(tmp_path, monkeypatch, capsys):
     import io
     p = tmp_path / "account"
