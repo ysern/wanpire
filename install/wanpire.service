@@ -1,0 +1,20 @@
+[Unit]
+Description=wanpire link emulator (REST API, web page and MCP on the control address)
+Documentation=https://github.com/ysern/wanpire
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# Every impairment cleared before anything else, so a box rebooted with a link applied comes
+# up clean; then the configured mode (bridge or router); then the server.
+ExecStartPre=/opt/wanpire/venv/bin/wanpire reset
+ExecStartPre=/opt/wanpire/venv/bin/wanpire up
+ExecStart=/opt/wanpire/venv/bin/wanpire serve
+ExecStopPost=/opt/wanpire/venv/bin/wanpire reset
+# The control address may arrive after network-online (Wi-Fi): try again.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

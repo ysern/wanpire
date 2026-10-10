@@ -209,3 +209,25 @@ def test_the_control_address_is_read_from_ip(monkeypatch):
     monkeypatch.setattr(cli, "run", fake_run)
     assert cli.control_address("wlan0") == "192.0.2.10"
     assert seen == [["ip", "-j", "-4", "addr", "show", "dev", "wlan0"]]
+
+
+# -- reset: every impairment cleared, at the service's start ----------------------------------
+
+def test_reset_clears_every_outbound_adapter(fake, tmp_path):
+    cfg = tmp_path / "wanpire.json"
+    cfg.write_text(json.dumps({"schema": "wanpire-config/1", "mode": "bridge",
+                               "adapters": {"control": "wlan0", "inbound": "eth0",
+                                            "outbound": ["eth1"]}}))
+    assert cli.main(["reset", "--config", str(cfg)]) == 0
+    assert fake.calls == [("clear", "eth1")]
+    assert fake.made["control"] == {"wlan0"}
+
+
+def test_reset_in_a_namespace(fake, tmp_path):
+    cfg = tmp_path / "wanpire.json"
+    cfg.write_text(json.dumps({"schema": "wanpire-config/1", "mode": "bridge",
+                               "adapters": {"control": "ctl0", "inbound": "n1",
+                                            "outbound": ["o1"]}}))
+    assert cli.main(["reset", "--config", str(cfg), "--netns", "wp-box"]) == 0
+    assert fake.made["netns"] == "wp-box"
+    assert fake.calls == [("clear", "o1")]

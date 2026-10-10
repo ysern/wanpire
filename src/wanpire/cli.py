@@ -5,6 +5,7 @@
     wanpire down
     wanpire serve                    (the REST API, the web page and the MCP, on the control address)
     wanpire mcp --url http://<pi-address>:8080   (the MCP over stdio on a host; WANPIRE_TOKEN)
+    wanpire reset                    (clear every configured outbound adapter; the service's start)
     wanpire endpoints
     wanpire preview london:consumer-fibre los-angeles:mobile-4g
     wanpire apply --adapter eth1 london:consumer-fibre los-angeles:mobile-4g
@@ -74,6 +75,15 @@ def _serve(a) -> int:
     return 0
 
 
+def _reset(a) -> int:
+    """Clear every configured outbound adapter, whatever is on it (at boot, and on stop)."""
+    cfg = load_config(a.config, None)  # not checked against the adapters: they may be missing
+    engine = make_engine(netns=a.netns, control=[cfg.control])
+    for adapter in cfg.outbound:
+        engine.clear(adapter)
+    return 0
+
+
 def _mcp(a) -> int:
     """The MCP over stdio on a host, calling the box's REST API at ``--url``."""
     import os
@@ -123,6 +133,9 @@ def _parser() -> argparse.ArgumentParser:
     sv.add_argument("--host", help="listen here instead of the control adapter's address")
     sv.add_argument("--port", type=int, default=8080)
     sv.add_argument("--netns", help="the namespace the outbound adapter lives in (test beds)")
+    rs = sub.add_parser("reset", help="clear every configured outbound adapter")
+    rs.add_argument("--config", default=DEFAULT_PATH)
+    rs.add_argument("--netns", help="the namespace the outbound adapter lives in (test beds)")
     mc = sub.add_parser("mcp", help="run the MCP over stdio here, calling the box's REST API")
     mc.add_argument("--url", required=True, help="the box, e.g. http://<pi-address>:8080")
     mc.add_argument("--token-file", help="a file holding the box's token (else WANPIRE_TOKEN)")
@@ -165,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
             return _serve(a)
         if a.command == "mcp":
             return _mcp(a)
+        if a.command == "reset":
+            return _reset(a)
         if a.command in ("up", "down"):
             adapters = {x.name: x for x in list_adapters()}
             cfg = load_config(a.config, adapters)

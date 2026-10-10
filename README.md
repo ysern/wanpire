@@ -8,6 +8,18 @@ duplication, set separately for each direction. Describe the link by its two end
 for example *London on consumer fibre* to *Los Angeles on 4G*, and wanpire works out
 the rest. Drive it from a web page, a REST API, or any MCP-capable AI agent.
 
+To install it on the box (Ubuntu Server, or any Debian-like Linux with two Ethernet ports), from
+a checkout:
+
+```sh
+sudo install/install.sh                 # roles detected: Wi-Fi control, on-board in, USB out
+sudo install/install.sh --dry-run       # what it would do, changing nothing
+sudo install/install.sh uninstall       # and back out (--purge also removes /etc/wanpire)
+```
+
+It installs a service that clears every impairment at boot and serves the web page, the REST
+API and the MCP on the control address, port 8080. The token is in `/etc/wanpire/token`.
+
 The reference build is a Raspberry Pi 4 with Ubuntu Server 24.04 LTS, its on-board
 Ethernet port as the link in and a USB 3 gigabit Ethernet adapter as the link out,
 controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports should do.

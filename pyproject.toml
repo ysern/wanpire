@@ -25,5 +25,5 @@ where = ["src"]
 wanpire = ["data/**/*.json", "web/*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/ui"]
+testpaths = ["tests/unit", "tests/ui", "tests/install"]
 markers = ["netns: needs root and Linux network namespaces"]

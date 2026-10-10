@@ -91,7 +91,8 @@ arrives after `network-online`. Root, as A10 says.
 ### I5. Tested against a staging root
 
 `--root DIR` prefixes every path and skips apt, `systemctl` and `netplan`; `--sysfs DIR` points
-detection at a fake `/sys/class/net`; `--no-venv` skips the venv (and the check that needs it).
+detection at a fake `/sys/class/net`; `--no-venv` skips the venv (and the check that needs it). `--no-check`, with all three roles
+named, installs without looking for the adapters: for a box whose USB port is not plugged in yet.
 `tests/install/` runs the script that way in a temporary directory, without root, on any Linux:
 files and their modes, detection, refusals, idempotence (a second run's files are byte-identical),
 uninstall. `--dry-run` prints the steps and writes nothing.

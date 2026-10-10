@@ -1,0 +1,220 @@
+"""install/install.sh against a staging root, without root and without the hardware (spec: install).
+
+Linux only: the script is POSIX sh for Debian-like systems.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux") or not shutil.which("sh"),
+                                reason="the install script is for Linux")
+
+SCRIPT = Path(__file__).resolve().parents[2] / "install" / "install.sh"
+ROLES = ["--control", "wlan0", "--inbound", "eth0", "--outbound", "eth1"]
+
+
+def fake_sysfs(base: Path, ifaces: dict[str, str]) -> Path:
+    """A /sys/class/net with each interface of a kind: wifi, onboard, usb or virtual."""
+    net = base / "sys" / "class" / "net"
+    net.mkdir(parents=True)
+    for name, kind in ifaces.items():
+        d = net / name
+        d.mkdir()
+        if kind == "virtual":
+            continue
+        dev = base / "devices" / ("usb2/2-1/2-1:1.0" if kind == "usb" else f"platform/{name}")
+        dev.mkdir(parents=True)
+        (d / "device").symlink_to(dev)
+        if kind == "wifi":
+            (d / "wireless").mkdir()
+    return net
+
+
+PI = {"lo": "virtual", "wlan0": "wifi", "eth0": "onboard", "eth1": "usb"}
+
+
+@pytest.fixture
+def box(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    sysfs = fake_sysfs(tmp_path, PI)
+
+    def run(*args, sysfs_dir=sysfs, check=True):
+        r = subprocess.run(["sh", str(SCRIPT), *args, "--root", str(root), "--no-venv",
+                            "--sysfs", str(sysfs_dir)],
+                           capture_output=True, text=True, timeout=60)
+        if check:
+            assert r.returncode == 0, r.stdout + r.stderr
+        return r
+
+    run.root = root
+    run.tmp = tmp_path
+    return run
+
+
+def files(root: Path) -> dict[str, bytes]:
+    return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*"))
+            if p.is_file()}
+
+
+def mode(p: Path) -> int:
+    return stat.S_IMODE(p.stat().st_mode)
+
+
+# -- a first install ------------------------------------------------------------------------
+
+def test_a_first_install_with_roles(box):
+    box(*ROLES)
+    cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
+    assert cfg == {"schema": "wanpire-config/1", "mode": "bridge",
+                   "adapters": {"control": "wlan0", "inbound": "eth0", "outbound": ["eth1"]}}
+    token = box.root / "etc/wanpire/token"
+    assert len(token.read_text().strip()) == 64
+    int(token.read_text().strip(), 16)
+    assert mode(token) == 0o600
+    unit = (box.root / "etc/systemd/system/wanpire.service").read_text()
+    assert "ExecStart=/opt/wanpire/venv/bin/wanpire serve" in unit
+    assert (box.root / "etc/systemd/system/multi-user.target.wants/wanpire.service").is_symlink()
+
+
+def test_the_unit_clears_before_it_sets_up_and_serves(box):
+    box(*ROLES)
+    lines = (box.root / "etc/systemd/system/wanpire.service").read_text().splitlines()
+    order = [i for i, line in enumerate(lines)
+             if line.startswith(("ExecStartPre=", "ExecStart="))]
+    cmds = [lines[i].split("wanpire ", 1)[-1] for i in order]
+    assert cmds == ["reset", "up", "serve"]
+    assert "Restart=on-failure" in lines
+
+
+# -- detection ------------------------------------------------------------------------------
+
+def test_roles_detected(box):
+    out = box().stdout
+    cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
+    assert cfg["adapters"] == {"control": "wlan0", "inbound": "eth0", "outbound": ["eth1"]}
+    assert "wlan0" in out and "eth1" in out
+
+
+def test_no_outbound_port_stops_before_any_change(box):
+    sysfs = fake_sysfs(box.tmp / "two", {"lo": "virtual", "wlan0": "wifi", "eth0": "onboard"})
+    r = box(sysfs_dir=sysfs, check=False)
+    assert r.returncode != 0
+    assert "outbound" in r.stderr and "--outbound" in r.stderr
+    assert files(box.root) == {}
+
+
+def test_a_named_adapter_that_does_not_exist(box):
+    r = box("--control", "wlan0", "--inbound", "eth0", "--outbound", "eth9", check=False)
+    assert r.returncode != 0
+    assert "eth9" in r.stderr
+    assert files(box.root) == {}
+
+
+def test_outbound_shared_with_control_refused(box):
+    r = box("--control", "eth1", "--inbound", "eth0", "--outbound", "eth1", check=False)
+    assert r.returncode != 0
+    assert "outbound" in r.stderr
+    assert files(box.root) == {}
+
+
+# -- netplan --------------------------------------------------------------------------------
+
+def test_netplan_in_bridge_mode(box):
+    box(*ROLES)
+    p = box.root / "etc/netplan/60-wanpire.yaml"
+    text = p.read_text()
+    assert "eth0:" in text and "eth1:" in text and "wlan0" not in text
+    assert text.count("dhcp4: false") == 2 and text.count("dhcp6: false") == 2
+    assert "accept-ra: false" in text and "link-local: []" in text
+    assert mode(p) == 0o600
+
+
+def test_netplan_in_router_mode(box):
+    box(*ROLES, "--mode", "router")
+    text = (box.root / "etc/netplan/60-wanpire.yaml").read_text()
+    assert "eth1:" in text and "eth0" not in text and "wlan0" not in text
+    cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
+    assert cfg["mode"] == "router"
+
+
+# -- idempotence and refusals ---------------------------------------------------------------
+
+def test_idempotent(box):
+    box(*ROLES)
+    first = files(box.root)
+    out = box(*ROLES).stdout
+    assert files(box.root) == first
+    assert "unchanged" in out
+
+
+def test_other_roles_on_an_installed_box_refused(box):
+    box(*ROLES)
+    first = files(box.root)
+    r = box("--control", "wlan0", "--inbound", "eth0", "--outbound", "eth2", check=False)
+    assert r.returncode != 0
+    assert "wanpire.json" in r.stderr and "--purge" in r.stderr
+    assert files(box.root) == first
+
+
+def test_dry_run_writes_nothing(box):
+    r = box(*ROLES, "--dry-run")
+    assert "would" in r.stdout
+    assert files(box.root) == {}
+
+
+@pytest.mark.skipif(sys.platform.startswith("linux") and os.geteuid() == 0,
+                    reason="run as root")
+def test_without_root_or_a_staging_root_refused():
+    r = subprocess.run(["sh", str(SCRIPT), *ROLES, "--no-venv"], capture_output=True,
+                       text=True, timeout=60)
+    assert r.returncode != 0
+    assert "root" in r.stderr
+
+
+# -- uninstall ------------------------------------------------------------------------------
+
+def test_uninstall_keeps_the_configuration(box):
+    box(*ROLES)
+    box("uninstall")
+    left = files(box.root)
+    assert set(left) == {"etc/wanpire/wanpire.json", "etc/wanpire/token"}
+    assert not (box.root / "etc/systemd/system/multi-user.target.wants/wanpire.service").exists()
+    assert not (box.root / "opt/wanpire").exists()
+
+
+def test_uninstall_purge(box):
+    box(*ROLES)
+    box("uninstall", "--purge")
+    assert files(box.root) == {}
+    assert not (box.root / "etc/wanpire").exists()
+
+
+def test_install_after_uninstall_keeps_the_token(box):
+    box(*ROLES)
+    token = (box.root / "etc/wanpire/token").read_text()
+    box("uninstall")
+    box(*ROLES)
+    assert (box.root / "etc/wanpire/token").read_text() == token
+
+
+def test_no_check_installs_roles_not_plugged_in(box):
+    box("--control", "wlan0", "--inbound", "eth0", "--outbound", "eth7", "--no-check")
+    cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
+    assert cfg["adapters"]["outbound"] == ["eth7"]
+
+
+def test_no_check_needs_every_role(box):
+    r = box("--outbound", "eth7", "--no-check", check=False)
+    assert r.returncode != 0
+    assert "--control" in r.stderr
+    assert files(box.root) == {}

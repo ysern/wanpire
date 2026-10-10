@@ -64,3 +64,7 @@ reversed). Answered questions stay, marked answered.
 | A43 ⚪ | The MCP offers no tool to end another client's lease: that is a person's decision, at the web page | A tool with a confirmation argument |
 | A44 ⚪ | The MCP SDK is pinned to its 2.x line (`mcp>=2.3,<3`), where the server class is `MCPServer` | The 1.x line (`FastMCP`) |
 | A45 ⚪ | The skill is instructions only (no scripts), assumes the MCP is registered as `wanpire`, and tells an agent that cannot wait between polls to leave the queue and say the link is busy | A polling script in the skill; holding a queue place it will not poll |
+| A46 ⚪ | The install writes and validates the netplan drop-in but applies it only with `--apply-netplan` (else at the next boot): applying restarts networking, the Wi-Fi control path included | Applying by default |
+| A47 ⚪ | The install never overwrites `/etc/wanpire/wanpire.json`; other roles on an installed box are refused, saying how to change them | Rewriting the file with the new roles |
+| A48 ⚪ | The service runs `wanpire reset` (clear every outbound adapter) and `wanpire up` before serving, `reset` again after stopping, and restarts on failure | Clearing at boot from a separate oneshot unit |
+| A49 ⚪ | The install needs Python 3.12 or later and says so on an older system (Debian 12 has 3.11) | Supporting 3.11 now |

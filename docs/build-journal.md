@@ -633,3 +633,26 @@ Followed by hand on the Pi's namespace bed, with a person holding the link: the 
 the person released it, described Tokyo to London over a geostationary satellite (410 ms each
 way), applied it, and a ping across the bed averaged 817 ms with the counters showing the
 packets in both directions. Cleared and released, the ping was back to 0.13 ms.
+
+## 2026-10-10 — One script to make a box
+
+Everything so far ran from a checkout, with a token made by hand. Now `install/install.sh` turns
+Ubuntu Server (or any Debian-like Linux with two Ethernet ports) into a wanpire box: the packages,
+a virtual environment in `/opt/wanpire`, the configuration with the adapters' roles, a token, a
+netplan drop-in that leaves the line's two ports without an address, and a systemd service that
+clears every impairment, sets up the bridge and serves on the Wi-Fi address.
+
+The script is careful about the one thing that can lock you out of a headless box: the network.
+It never names the control adapter in netplan, and it writes and validates the drop-in but does
+not apply it unless asked, because applying netplan restarts networking, Wi-Fi included. It runs
+every check before its first change, so a missing USB adapter stops it with the box untouched.
+And it is idempotent: run it twice and the second run says "unchanged" for every step, keeping
+the token.
+
+The USB adapter has not arrived, so the script was tested two ways. Seventeen tests run it
+against a staging directory with a fake `/sys/class/net`, as an ordinary user: the files and
+their modes, the roles detected, the refusals, the second run byte for byte, the uninstall. Then
+a real install on the Pi, with the roles pointed at a namespace test bed: the service came up,
+the web page answered over Wi-Fi, a link applied through the API put 84 ms across the bed, and a
+`systemctl restart` brought the line back to 0.13 ms on its own. `uninstall --purge` left nothing
+behind.
