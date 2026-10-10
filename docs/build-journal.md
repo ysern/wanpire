@@ -656,3 +656,24 @@ a real install on the Pi, with the roles pointed at a namespace test bed: the se
 the web page answered over Wi-Fi, a link applied through the API put 84 ms across the bed, and a
 `systemctl restart` brought the line back to 0.13 ms on its own. `uninstall --purge` left nothing
 behind.
+
+## 2026-10-10 — The page gets a proper look
+
+The first page was deliberately bare, one column of plain tables. The owner wanted it to look
+like the admin interface of a home router: the kind with a coloured band across the top, round
+icons for the sections, a menu down the side and white panels on a light grey page. Simple and
+neat, and familiar to anyone who has ever changed a Wi-Fi password.
+
+So the page was rebuilt to a set of style rules, written out in the project's own words in the
+web UI's design: the band 160 px tall, 44 px circled line icons, labels on the left of the forms,
+one primary button per panel, tables as white "pills" on a tinted card. The colours are
+wanpire's own: a wine red for a vampire on the wire, deepened until white text on it passes the
+accessibility guidelines (WCAG 2.2 AA) with room to spare, and a warm amber for "you are here".
+A dark theme keeps the same roles.
+
+Accessibility is not taken on trust. A test opens every page at 720 and 1,280 px, light and
+dark, and measures the contrast of every visible piece of text against what is really behind
+it, both ends of a gradient included. It caught one rule that could not be kept as written: the
+light grey for the sentence under each title is 2.4:1 on white, so it became a darker grey of
+the same family. Another test lists every request the page makes: nothing leaves the box, no
+web fonts, no icon sets, no scripts from elsewhere. 26 page tests in all, in 30 seconds.

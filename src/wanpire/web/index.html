@@ -9,108 +9,215 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <span class="brand">wanpire</span>
-  <span class="tagline">link emulator</span>
-  <button id="forget" class="link" type="button" hidden>Forget token</button>
-</header>
 
-<main>
-  <section id="signin" hidden>
-    <h2>Sign in</h2>
-    <p>The box's token is in <code>/etc/wanpire/token</code> on the box.</p>
-    <form id="token-form" class="form">
-      <label for="token">Token</label>
-      <input id="token" type="password" autocomplete="current-password" required>
-      <label for="name">Your name</label>
-      <input id="name" type="text" autocomplete="nickname" placeholder="shown to others as web: name" required>
-      <span></span>
-      <button id="token-save" type="submit" class="primary">Sign in</button>
-    </form>
+<!-- Signing in: the box's token, once -->
+<div id="signin-wrap" class="signin-wrap" hidden>
+  <form id="signin" class="signin">
+    <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-mark"/></svg>
+    <h1>wanpire</h1>
+    <p class="lead">Sign in to the link emulator with the box's token.</p>
+    <label for="token">Token:</label>
+    <input id="token" type="password" autocomplete="current-password" required>
+    <p class="help">It is in <code>/etc/wanpire/token</code> on the box.</p>
+    <label for="name">Your name:</label>
+    <input id="name" type="text" autocomplete="nickname" required>
+    <p class="help">Others see you as "web: <em>name</em>".</p>
+    <button id="token-save" type="submit" class="primary">Sign in</button>
     <p id="token-error" class="bad" role="alert"></p>
-  </section>
+  </form>
+</div>
 
-  <div id="app" hidden>
-    <section class="status" aria-label="Status">
-      <table class="facts">
-        <tr><th>Mode</th><td id="mode">-</td></tr>
-        <tr><th>Link</th><td id="link-state">-</td></tr>
-        <tr><th>Held by</th><td id="holder">-</td></tr>
-        <tr><th>Queue</th><td id="queue-count">-</td></tr>
-      </table>
-    </section>
-
-    <p id="message" role="status"></p>
-
-    <section>
-      <h2>Link</h2>
-      <div class="form">
-        <label for="near-endpoint">Near end (the device)</label>
-        <div class="pair">
-          <select id="near-endpoint"></select>
-          <select id="near-channel" aria-label="Near end's channel"></select>
-        </div>
-        <label for="far-endpoint">Far end (the network)</label>
-        <div class="pair">
-          <select id="far-endpoint"></select>
-          <select id="far-channel" aria-label="Far end's channel"></select>
-        </div>
+<div id="app" hidden>
+  <header class="band">
+    <div class="band-inner">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-mark"/></svg>
+        <div><span class="name">wanpire</span><span class="tagline">link emulator</span></div>
       </div>
-      <table class="figures" id="preview">
-        <thead><tr><th></th><th>Down</th><th>Up</th></tr></thead>
-        <tbody>
-          <tr><th>Delay, ms</th><td id="down-delay_ms">-</td><td id="up-delay_ms">-</td></tr>
-          <tr><th>Jitter, ms</th><td id="down-jitter_ms">-</td><td id="up-jitter_ms">-</td></tr>
-          <tr><th>Loss, %</th><td id="down-loss">-</td><td id="up-loss">-</td></tr>
-          <tr><th>Bandwidth, Mbit/s</th><td id="down-rate_mbit">-</td><td id="up-rate_mbit">-</td></tr>
-        </tbody>
-      </table>
-      <p id="path" class="note"></p>
-    </section>
+      <nav class="sections" aria-label="Sections">
+        <a id="nav-link" href="#link"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-link"/></svg></span><span class="label">Link</span></a>
+        <a id="nav-endpoints" href="#endpoints"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-globe"/></svg></span><span class="label">Endpoints</span></a>
+        <a id="nav-broker" href="#broker"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-people"/></svg></span><span class="label">Broker</span></a>
+        <a id="nav-adapters" href="#adapters"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-port"/></svg></span><span class="label">Adapters</span></a>
+        <a id="nav-settings" href="#settings"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-sliders"/></svg></span><span class="label">Settings</span></a>
+      </nav>
+    </div>
+  </header>
 
-    <section>
-      <h2>Lease</h2>
-      <p id="lease-state">You do not hold the link.</p>
-      <div class="form">
-        <label for="purpose">Purpose</label>
-        <input id="purpose" type="text" placeholder="what you are testing">
-      </div>
-      <div class="actions">
-        <button id="ask" type="button">Ask for the link</button>
-        <button id="apply" type="button" class="primary" disabled>Apply</button>
-        <button id="clear" type="button" disabled>Clear</button>
-        <button id="release" type="button" disabled>Release</button>
-      </div>
-    </section>
+  <div class="frame">
+    <aside class="side">
+      <nav id="side-link" data-section="link" aria-label="Link">
+        <span class="group">Link</span>
+        <a id="sub-link-set" href="#link/link-set">Set the link</a>
+        <a id="sub-link-counters" href="#link/link-counters">Counters</a>
+      </nav>
+      <nav id="side-endpoints" data-section="endpoints" aria-label="Endpoints">
+        <span class="group">Endpoints</span>
+        <a id="sub-endpoints-places" href="#endpoints/endpoints-places">Places</a>
+      </nav>
+      <nav id="side-broker" data-section="broker" aria-label="Broker">
+        <span class="group">Broker</span>
+        <a id="sub-broker-queue" href="#broker/broker-queue">Holder and queue</a>
+      </nav>
+      <nav id="side-adapters" data-section="adapters" aria-label="Adapters">
+        <span class="group">Adapters</span>
+        <a id="sub-adapters-list" href="#adapters/adapters-list">Roles</a>
+      </nav>
+      <nav id="side-settings" data-section="settings" aria-label="Settings">
+        <span class="group">Settings</span>
+        <a id="sub-settings-access" href="#settings/settings-access">Access</a>
+      </nav>
+    </aside>
 
-    <section>
-      <h2>Counters</h2>
-      <table class="figures" id="counters">
-        <thead><tr><th></th><th>Down</th><th>Up</th></tr></thead>
-        <tbody>
-          <tr><th>Packets</th><td id="c-down-packets">-</td><td id="c-up-packets">-</td></tr>
-          <tr><th>Bytes</th><td id="c-down-bytes">-</td><td id="c-up-bytes">-</td></tr>
-          <tr><th>Dropped by wanpire</th><td id="c-down-dropped">-</td><td id="c-up-dropped">-</td></tr>
-          <tr><th>Dropped by the bandwidth's queue</th><td id="c-down-shaper_dropped">-</td><td id="c-up-shaper_dropped">-</td></tr>
-          <tr><th>Queued now</th><td id="c-down-queued">-</td><td id="c-up-queued">-</td></tr>
-        </tbody>
-      </table>
-    </section>
+    <main>
+      <p id="message" role="status"></p>
 
-    <section>
-      <h2>Who is using the box</h2>
-      <table class="list" id="queue">
-        <thead><tr><th></th><th>Who</th><th>Purpose</th><th>For</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <div class="actions">
-        <button id="end-lease" type="button" class="danger" hidden>End this lease</button>
+      <!-- Link / Set the link -->
+      <div class="page" id="page-link-set">
+        <section class="panel">
+          <div class="head"><h2>State of the box</h2></div>
+          <p class="desc">What the box is doing now, refreshed every few seconds.</p>
+          <dl class="card">
+            <div><dt>Mode:</dt><dd id="mode">-</dd></div>
+            <div><dt>Link:</dt><dd id="link-state">-</dd></div>
+            <div><dt>Held by:</dt><dd id="holder">-</dd></div>
+            <div><dt>Queue:</dt><dd id="queue-count">-</dd></div>
+          </dl>
+        </section>
+
+        <section class="panel">
+          <div class="head"><h2>Lease</h2><button id="release" type="button" class="action" disabled>Release</button></div>
+          <p class="desc">Only the holder of the lease changes the link; reading is open to everyone.</p>
+          <p id="lease-state" class="state">You do not hold the link.</p>
+          <div class="form">
+            <label for="purpose">Purpose:</label>
+            <div class="control">
+              <input id="purpose" type="text" placeholder="what you are testing">
+              <p class="help">Shown to everyone waiting for the box.</p>
+            </div>
+            <span></span>
+            <div class="control"><button id="ask" type="button" class="primary">Ask for the link</button></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="head"><h2>Link</h2><button id="clear" type="button" class="action" disabled>Clear</button></div>
+          <p class="desc">Describe the link by its two ends: where the device is, and the rest of the network.</p>
+          <div class="form">
+            <label for="near-endpoint">Near end (the device):</label>
+            <div class="control pair">
+              <select id="near-endpoint"></select>
+              <select id="near-channel" aria-label="Near end's channel"></select>
+            </div>
+            <label for="far-endpoint">Far end (the network):</label>
+            <div class="control pair">
+              <select id="far-endpoint"></select>
+              <select id="far-channel" aria-label="Far end's channel"></select>
+            </div>
+          </div>
+          <dl class="card" id="preview">
+            <div><dt>Delay down, ms:</dt><dd id="down-delay_ms">-</dd></div>
+            <div><dt>Delay up, ms:</dt><dd id="up-delay_ms">-</dd></div>
+            <div><dt>Jitter down, ms:</dt><dd id="down-jitter_ms">-</dd></div>
+            <div><dt>Jitter up, ms:</dt><dd id="up-jitter_ms">-</dd></div>
+            <div><dt>Loss down, %:</dt><dd id="down-loss">-</dd></div>
+            <div><dt>Loss up, %:</dt><dd id="up-loss">-</dd></div>
+            <div><dt>Bandwidth down, Mbit/s:</dt><dd id="down-rate_mbit">-</dd></div>
+            <div><dt>Bandwidth up, Mbit/s:</dt><dd id="up-rate_mbit">-</dd></div>
+          </dl>
+          <p id="path" class="help"></p>
+          <div class="form">
+            <span></span>
+            <div class="control"><button id="apply" type="button" class="primary" disabled>Apply</button></div>
+          </div>
+        </section>
       </div>
-    </section>
+
+      <!-- Link / Counters -->
+      <div class="page" id="page-link-counters" hidden>
+        <section class="panel">
+          <div class="head"><h2>Counters</h2></div>
+          <p class="desc">What the box has done to the packets since the link was applied. Down is towards the device.</p>
+          <dl class="card" id="counters">
+            <div><dt>Packets down:</dt><dd id="c-down-packets">-</dd></div>
+            <div><dt>Packets up:</dt><dd id="c-up-packets">-</dd></div>
+            <div><dt>Bytes down:</dt><dd id="c-down-bytes">-</dd></div>
+            <div><dt>Bytes up:</dt><dd id="c-up-bytes">-</dd></div>
+            <div><dt>Dropped by wanpire, down:</dt><dd id="c-down-dropped">-</dd></div>
+            <div><dt>Dropped by wanpire, up:</dt><dd id="c-up-dropped">-</dd></div>
+            <div><dt>Dropped by the bandwidth's queue, down:</dt><dd id="c-down-shaper_dropped">-</dd></div>
+            <div><dt>Dropped by the bandwidth's queue, up:</dt><dd id="c-up-shaper_dropped">-</dd></div>
+            <div><dt>Queued now, down:</dt><dd id="c-down-queued">-</dd></div>
+            <div><dt>Queued now, up:</dt><dd id="c-up-queued">-</dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <!-- Endpoints / Places -->
+      <div class="page" id="page-endpoints-places" hidden>
+        <section class="panel">
+          <div class="head"><h2>Places</h2></div>
+          <p class="desc">The places a link is described by, and the kinds of connection each one offers.</p>
+          <div class="table"><table id="endpoints-table">
+            <thead><tr><th>Place</th><th>Country</th><th>Default channel</th><th>Channels</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </section>
+      </div>
+
+      <!-- Broker / Holder and queue -->
+      <div class="page" id="page-broker-queue" hidden>
+        <section class="panel">
+          <div class="head"><h2>Who is using the box</h2></div>
+          <p class="desc">One client drives the link at a time; the others wait in order of arrival.</p>
+          <div class="table"><table id="queue">
+            <thead><tr><th>Place</th><th>Who</th><th>Purpose</th><th>For</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <div class="buttons"><button id="end-lease" type="button" class="secondary danger" hidden>End this lease</button></div>
+        </section>
+      </div>
+
+      <!-- Adapters / Roles -->
+      <div class="page" id="page-adapters-list" hidden>
+        <section class="panel">
+          <div class="head"><h2>Adapters</h2></div>
+          <p class="desc">The box's network adapters and the role each one plays.</p>
+          <div class="table"><table id="adapters-table">
+            <thead><tr><th>Name</th><th>Kind</th><th>Role</th><th>State</th><th>Speed</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </section>
+      </div>
+
+      <!-- Settings / Access -->
+      <div class="page" id="page-settings-access" hidden>
+        <section class="panel">
+          <div class="head"><h2>Access</h2><a class="action" href="docs">API reference</a></div>
+          <p class="desc">How this browser signs in to the box.</p>
+          <dl class="card">
+            <div><dt>Your name:</dt><dd id="me">-</dd></div>
+            <div><dt>Token:</dt><dd>kept in this browser</dd></div>
+          </dl>
+          <div class="buttons"><button id="forget" type="button" class="secondary">Forget the token</button></div>
+        </section>
+      </div>
+
+      <footer>wanpire, an open-source link emulator</footer>
+    </main>
   </div>
-</main>
+</div>
 
-<footer>wanpire · <a href="docs">API</a></footer>
+<!-- Icons: white line drawings made for wanpire -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.9.1 5.5 1.6 5.5 4.3"/></symbol>
+  <symbol id="i-port" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="13" rx="1.5"/><path d="M8 18v-4h8v4"/><path d="M9.5 9v2M12 9v2M14.5 9v2"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-mark" viewBox="0 0 48 48"><rect x="7" y="16" width="34" height="22" rx="4" fill="#1d1f22"/><path d="M7 22a8 8 0 0 1 8-8h18a8 8 0 0 1 8 8v2H7z" fill="#c9ccd1"/><circle cx="18" cy="28" r="3" fill="#fff"/><circle cx="30" cy="28" r="3" fill="#fff"/><path d="M20 34l1.5 4 1.5-4zM25 34l1.5 4 1.5-4z" fill="#fff"/></symbol>
+</svg>
+
 <script src="app.js"></script>
 </body>
 </html>

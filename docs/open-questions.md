@@ -68,3 +68,6 @@ reversed). Answered questions stay, marked answered.
 | A47 ⚪ | The install never overwrites `/etc/wanpire/wanpire.json`; other roles on an installed box are refused, saying how to change them | Rewriting the file with the new roles |
 | A48 ⚪ | The service runs `wanpire reset` (clear every outbound adapter) and `wanpire up` before serving, `reset` again after stopping, and restarts on failure | Clearing at boot from a separate oneshot unit |
 | A49 ⚪ | The install needs Python 3.12 or later and says so on an older system (Debian 12 has 3.11) | Supporting 3.11 now |
+| A50 ⚪ | The web page's palette is wanpire's own: a wine-red primary (`#a0213a` to `#6e1022`, white text 7.6:1 and 11.9:1) and a warm amber accent (`#f2b134`) for what is active, light and dark | A crimson brighter than AA allows for white text; a blue or teal primary |
+| A51 ⚪ | The grey sentence under each section title is `#646c71` (5.4:1 on white), not the style rules' `#a7a9ac` (2.4:1, below WCAG AA) | The rules' grey as written |
+| A52 ⚪ | The page's sections: Link (set the link, counters), Endpoints (places), Broker (holder and queue), Adapters (roles), Settings (access); from 720 px the side menu sits left, below it on top | Fewer sections; a settings page that changes the box (the API cannot yet) |

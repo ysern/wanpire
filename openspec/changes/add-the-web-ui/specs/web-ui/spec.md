@@ -92,11 +92,34 @@ ask for a confirmation and a reason first, and SHALL do nothing if the person ca
 - **WHEN** the person presses End lease, gives the reason "bench needed" and confirms
 - **THEN** the lease is ended with that reason
 
-### Requirement: The page is plain and readable on a phone
+### Requirement: The page looks like a home router's admin interface
 
-The page SHALL use one column at most about 800 px wide, system fonts, and SHALL follow the
-browser's light or dark preference. At a phone's width (360 px) nothing SHALL need scrolling
-sideways.
+The page SHALL carry a header band with the sections Link, Endpoints, Broker, Adapters and
+Settings, the active one marked; a side menu for a section's sub-pages; white panels on a light
+grey page in a centred column of about 1,070 px; forms with labels on the left; at most one
+primary button per section; and SHALL follow the browser's light or dark preference. It SHALL
+fetch nothing from elsewhere.
+
+#### Scenario: Going to a section
+- **GIVEN** the page on Link
+- **WHEN** the person picks Broker in the header band
+- **THEN** Broker is marked active, and the holder and the queue are shown
+
+#### Scenario: Nothing from elsewhere
+- **GIVEN** the page loading
+- **WHEN** every request it makes is listed
+- **THEN** each goes to the box itself
+
+### Requirement: The page is readable at every width and in both themes
+
+At 720 px and at 1,280 px, in the light and the dark theme, nothing SHALL need scrolling sideways,
+and every visible text SHALL have a contrast of at least 4.5:1 with its background (3:1 for large
+text), as WCAG 2.2 AA asks. At a phone's width (360 px) nothing SHALL need scrolling sideways.
+
+#### Scenario: Contrast in the dark
+- **GIVEN** a 1,280 px window that prefers the dark theme
+- **WHEN** the page shows the link's figures and the counters
+- **THEN** every visible text has at least 4.5:1 against its background
 
 #### Scenario: On a phone
 - **GIVEN** a 360 px wide window

@@ -84,6 +84,52 @@ function option(value, text) {
   return o;
 }
 
+// -- sections and pages: #section/page in the address ------------------------------------
+
+const FIRST = {
+  link: "link-set", endpoints: "endpoints-places", broker: "broker-queue",
+  adapters: "adapters-list", settings: "settings-access",
+};
+
+function route() {
+  let [section, sub] = location.hash.replace(/^#/, "").split("/");
+  if (!FIRST[section]) section = "link";
+  if (!sub || !$(`page-${sub}`) || !sub.startsWith(section)) sub = FIRST[section];
+  for (const s of Object.keys(FIRST)) {
+    const on = s === section;
+    if (on) $(`nav-${s}`).setAttribute("aria-current", "page");
+    else $(`nav-${s}`).removeAttribute("aria-current");
+    $(`side-${s}`).hidden = !on;
+  }
+  for (const a of document.querySelectorAll(".side a")) {
+    if (a.id === `sub-${sub}`) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  }
+  for (const p of document.querySelectorAll(".page")) p.hidden = p.id !== `page-${sub}`;
+}
+
+window.addEventListener("hashchange", route);
+
+function fillTable(id, rows) {
+  const body = $(id).tBodies[0];
+  body.replaceChildren(...rows.map((cells) => {
+    const tr = document.createElement("tr");
+    for (const text of cells) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.append(td);
+    }
+    return tr;
+  }));
+}
+
+async function loadAdapters() {
+  const res = await call("GET", "adapters");
+  if (!res.ok) return;
+  fillTable("adapters-table", res.data.map((a) => [
+    a.name, a.kind, a.role || "none", a.state || "-", a.speed_mbit ? `${a.speed_mbit} Mbit/s` : "-"]));
+}
+
 // -- signing in -----------------------------------------------------------------------------
 
 function signOut(why) {
@@ -92,20 +138,21 @@ function signOut(why) {
   clearInterval(statusTimer);
   statusTimer = null;
   $("app").hidden = true;
-  $("forget").hidden = true;
-  $("signin").hidden = false;
+  $("signin-wrap").hidden = false;
   $("name").value = name;
   $("token").value = "";
   $("token-error").textContent = why || "";
 }
 
 async function signIn() {
-  $("signin").hidden = true;
+  $("signin-wrap").hidden = true;
   $("app").hidden = false;
-  $("forget").hidden = false;
+  $("me").textContent = `web: ${name}`;
+  route();
   try {
     await refresh();
     await loadEndpoints();
+    await loadAdapters();
   } catch (e) {
     if (!(e instanceof Refused)) say(`Cannot reach the box: ${e.message}`, "bad");
     return;
@@ -116,7 +163,7 @@ async function signIn() {
   showLease();
 }
 
-$("token-form").addEventListener("submit", (ev) => {
+$("signin").addEventListener("submit", (ev) => {
   ev.preventDefault();
   token = $("token").value.trim();
   name = $("name").value.trim();
@@ -180,6 +227,9 @@ async function loadEndpoints() {
   const res = await call("GET", "endpoints");
   if (!res.ok) { say(errorOf(res), "bad"); return; }
   endpoints = res.data;
+  fillTable("endpoints-table", endpoints.map((e) => [
+    e.name, e.country, e.default_channel.replaceAll("-", " "),
+    Object.keys(e.channels).length + " kinds"]));
   for (const [end, fallback] of [["near", 0], ["far", 1]]) {
     const sel = $(`${end}-endpoint`);
     const keep = sel.value;

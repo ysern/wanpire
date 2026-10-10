@@ -158,6 +158,7 @@ def test_ending_another_lease_cancelled(page):
     agent_asks(page.box)
     sign_in(page)
     expect(page.locator("#holder")).to_contain_text("agent-7")
+    page.click("#nav-broker")
     page.once("dialog", lambda d: d.dismiss())
     page.click("#end-lease")
     page.wait_for_timeout(300)
@@ -168,6 +169,7 @@ def test_ending_another_lease_confirmed(page):
     ticket = agent_asks(page.box)
     sign_in(page)
     expect(page.locator("#holder")).to_contain_text("agent-7")
+    page.click("#nav-broker")
     page.once("dialog", lambda d: d.accept("bench needed"))
     page.click("#end-lease")
     expect(page.locator("#holder")).to_have_text("nobody")
@@ -182,6 +184,8 @@ def test_no_end_lease_button_for_your_own(page):
     page.fill("#purpose", "trying a call")
     page.click("#ask")
     expect(page.locator("#lease-state")).to_contain_text("You hold the link")
+    page.click("#nav-broker")
+    expect(page.locator("#queue")).to_contain_text("web: ana")
     expect(page.locator("#end-lease")).to_be_hidden()
 
 

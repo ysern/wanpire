@@ -17,3 +17,11 @@
 
 - [x] 3.1 Try it on the Pi against a namespace bed, from a phone-sized window
 - [x] 3.2 Journal, open questions, README
+
+## 4. Revision: the router-admin look (the owner's style rules)
+
+- [x] 4.1 Design U5 rewritten with the rules in wanpire's own words; the spec's look requirements
+- [x] 4.2 Failing tests: sections in the header band and the side menu; nothing fetched from elsewhere
+- [x] 4.3 Failing tests: at 720 and 1,280 px, light and dark: no sideways scroll, contrast AA
+- [x] 4.4 Restyle `index.html`, `style.css`, `app.js` until green; the existing tests follow the sections
+- [x] 4.5 Journal, open questions
