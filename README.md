@@ -59,7 +59,9 @@ read the counters and see who else is using the box.
 AI agents use the MCP at `http://<pi-address>:8080/mcp` (streamable HTTP, the same token in an
 `Authorization: Bearer` header), or run it on their own machine over stdio with
 `wanpire mcp --url http://<pi-address>:8080`. Client configurations for both are in
-[`examples/mcp/`](examples/mcp/).
+[`examples/mcp/`](examples/mcp/). The skill [`skills/wanpire/SKILL.md`](skills/wanpire/SKILL.md),
+in the open Agent Skills format, teaches an agent to share the box: lease, wait, apply, check,
+clear and release; copy its folder into your agent host's skills.
 
 A link is cleared by itself after two minutes unless renewed (`wanpire renew`), so a
 forgotten one never lingers. Tests: `.venv/bin/pytest` (no root needed; the web page's tests run in a headless browser when

@@ -610,3 +610,26 @@ across the bed went from 0.12 ms to 279 ms; it cleared and released, and the pin
 0.12 ms. The same through `wanpire mcp` over stdio. The SDK had just moved to a 2.x line that
 renamed its server class, which cost ten minutes of reading the installed package rather than
 the internet's examples.
+
+## 2026-10-10 — Teaching agents manners: the skill
+
+Tools are not enough. An agent that applies a link and then stops to ask its user a question
+holds the only link for as long as the answer takes; one that forgets to poll loses its lease
+and runs the rest of its test on a clean line without noticing. So wanpire ships a skill,
+`skills/wanpire/SKILL.md`, in the open Agent Skills format: a folder any agent host can copy into
+its skills, with a short front matter and plain instructions.
+
+What it teaches fits on one screen: register the MCP; ask for the link with who you are and why;
+if queued, say *once* that you are waiting and poll at the interval the answer gives; describe
+the link by two places and check it before applying; prove with the counters that your traffic
+crosses the box; and give the link back the moment you are done, or before you stop to wait for
+a person. Never end another agent's lease.
+
+A test keeps it honest: it fails if the skill names a tool the MCP no longer has, or stops
+teaching any step of a lease's life.
+
+Followed by hand on the Pi's namespace bed, with a person holding the link: the agent was told
+"Queued at position 1. Say once that you are waiting...", got the link on its next poll after
+the person released it, described Tokyo to London over a geostationary satellite (410 ms each
+way), applied it, and a ping across the bed averaged 817 ms with the counters showing the
+packets in both directions. Cleared and released, the ping was back to 0.13 ms.

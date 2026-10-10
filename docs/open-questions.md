@@ -63,3 +63,4 @@ reversed). Answered questions stay, marked answered.
 | A42 ⚪ | `/mcp` needs the box's bearer token; the SDK's DNS-rebinding check is off because the token already stops a browser without it | Keeping the check, which would refuse the box's own name and addresses |
 | A43 ⚪ | The MCP offers no tool to end another client's lease: that is a person's decision, at the web page | A tool with a confirmation argument |
 | A44 ⚪ | The MCP SDK is pinned to its 2.x line (`mcp>=2.3,<3`), where the server class is `MCPServer` | The 1.x line (`FastMCP`) |
+| A45 ⚪ | The skill is instructions only (no scripts), assumes the MCP is registered as `wanpire`, and tells an agent that cannot wait between polls to leave the queue and say the link is busy | A polling script in the skill; holding a queue place it will not poll |
