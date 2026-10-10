@@ -16,3 +16,8 @@
 
 - [x] 3.1 On the Pi: the tests; a real install with the roles on a namespace bed (a unit drop-in), the service up, the web page reached over Wi-Fi; uninstall leaves it clean
 - [x] 3.2 Journal, open questions, README
+
+## 4. No token (I6, the owner, 2026-10-11)
+
+- [ ] 4.1 Failing tests (staging root): no credential written; the last line points to the first visit; `--user` with the password on standard input writes the account hashed, mode 0600; a second run keeps it; an old token is removed
+- [ ] 4.2 `install/install.sh` until green

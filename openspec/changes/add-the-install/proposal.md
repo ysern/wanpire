@@ -14,7 +14,9 @@ way back out.
   - `/etc/wanpire/wanpire.json` with the roles given or detected (Wi-Fi as control, the
     on-board port as inbound, a USB port as outbound), checked by wanpire itself; kept if it
     exists;
-  - `/etc/wanpire/token`, generated once, mode 0600;
+  - no credential: the box's account is made on the first visit to its web page, or given to
+    the script with `--user`, the password on standard input (revised 2026-10-11; the first
+    version generated `/etc/wanpire/token`);
   - a netplan drop-in, `/etc/netplan/60-wanpire.yaml`, giving the bridge's ports no address (in
     router mode, only the outbound port), leaving the control adapter's configuration as it is;
     validated with `netplan generate`, applied at the next boot or with `--apply-netplan`;
@@ -29,7 +31,7 @@ way back out.
 ## Decided and assumed
 
 Decided by the design (D3, D10) and the plan (B4): one idempotent script, a venv in
-`/opt/wanpire`, the token at install, root under systemd, the bridge's ports address-less, the
+`/opt/wanpire`, the account on the first visit (the token at install until 2026-10-11), root under systemd, the bridge's ports address-less, the
 control on Wi-Fi. Assumed here (also in `docs/open-questions.md`):
 
 - the netplan drop-in is written and validated but not applied unless asked, because applying

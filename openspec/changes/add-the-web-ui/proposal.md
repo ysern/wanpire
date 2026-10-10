@@ -33,6 +33,11 @@ Assumed here (also in `docs/open-questions.md`):
   when the page is closed; the box's dead-man covers a browser that dies;
 - scenarios are not shown: the engine has none yet.
 
+## Revised after the first use (the owner, 2026-10-11)
+
+- No token: the first visit makes the box's account, a user name and a password, as a home
+  router's setup does, and the page signs in with it (design U2; R6 of `add-the-rest-api`).
+
 ## Capabilities
 
 ### New Capabilities

@@ -60,9 +60,26 @@ and stdio is for a host that cannot reach `/mcp` or wants the token in its own k
 `examples/mcp/http.json` (a URL and an `Authorization` header) and `examples/mcp/stdio.json` (the
 `wanpire mcp` command), in the `mcpServers` shape most hosts read, with placeholders only.
 
+### M7. The account instead of the token (revised, the owner, 2026-10-11)
+
+The box has no token any more (R6 of `add-the-rest-api`): one account, a user name and a
+password, for people and agents alike. Where M1, M4, M5 and M6 say "token":
+
+- **M1.** The REST client sends the account in HTTP Basic. On the box, the in-process client
+  carries a random credential the app makes at start and never writes down, so the MCP needs no
+  copy of the password.
+- **M4.** `/mcp` takes Basic only, not the web page's session cookie: a page from another site
+  that got a browser to post to the box would carry the cookie, never the password, so the
+  DNS-rebinding check can stay off as before.
+- **M5.** `wanpire mcp --url ...` reads the user from `WANPIRE_USER` and the password from
+  `WANPIRE_PASSWORD` or `--password-file`, and refuses to start without both.
+- **M6.** `examples/mcp/http.json` carries `Authorization: Basic ${WANPIRE_BASIC}`, the
+  base64 of `user:password`, from the environment; `stdio.json` passes the two variables.
+
 ## Risks / Trade-offs
 
 - **The SDK's 2.x line is young** and renamed its server class from 1.x. → Pinned to `<3`; the
   layer is small enough to port.
-- **The token sits in the host's MCP configuration.** → The examples read it from an
-  environment variable where the host supports it.
+- **The password sits in the host's MCP configuration**, as the token did, and it is the same
+  password a person signs in with. → The examples read it from the environment where the host
+  supports it; the README says to keep it out of anything committed.

@@ -25,3 +25,10 @@
 - [x] 4.3 Failing tests: at 720 and 1,280 px, light and dark: no sideways scroll, contrast AA
 - [x] 4.4 Restyle `index.html`, `style.css`, `app.js` until green; the existing tests follow the sections
 - [x] 4.5 Journal, open questions
+
+## 5. Revision: after the first use (the owner, 2026-10-11)
+
+- [ ] 5.1 Spec and design U2; the REST API's R6 first
+- [ ] 5.2 Failing tests: set up on a new box (made, signed in; passwords differ; too short); sign in, wrong password, coming back, sign out; change the password; no credential in the browser's storage
+- [ ] 5.3 `index.html`, `style.css`, `app.js` until green; the look tests still pass
+- [ ] 5.4 Try it on the Pi; journal, open questions

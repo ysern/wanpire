@@ -9,7 +9,7 @@ An MCP server through which any MCP host drives wanpire, as a thin layer over it
 The MCP server SHALL offer the tools `wanpire_status`, `wanpire_endpoints`, `wanpire_lease`,
 `wanpire_poll`, `wanpire_describe`, `wanpire_apply`, `wanpire_clear`, `wanpire_counters` and
 `wanpire_release`, and each SHALL do its work by calling the REST API under `/api/v1` with the
-box's token. No tool SHALL end another client's lease.
+box's account. No tool SHALL end another client's lease.
 
 #### Scenario: The tools listed
 - **GIVEN** an MCP client connected to the server
@@ -57,28 +57,28 @@ that the lease ended and why; a change without the lease SHALL say who holds it.
 - **WHEN** the agent calls `wanpire_apply`
 - **THEN** the tool fails with a message that says its lease ended and gives "bench needed"
 
-### Requirement: Served on the box behind the token
+### Requirement: Served on the box behind the account
 
 `wanpire serve` SHALL serve the MCP over streamable HTTP at `/mcp`, and SHALL refuse a request
-without the box's bearer token with 401.
+without the box's account, in HTTP Basic credentials, with 401.
 
-#### Scenario: No token
+#### Scenario: No credentials
 - **GIVEN** the server running
-- **WHEN** a client posts to `/mcp` without the token
+- **WHEN** a client posts to `/mcp` without credentials
 - **THEN** it is answered 401
 
-#### Scenario: With the token, over HTTP
+#### Scenario: With the account, over HTTP
 - **GIVEN** the server running
-- **WHEN** an MCP client connects to `/mcp` with the token and calls `wanpire_status`
+- **WHEN** an MCP client connects to `/mcp` with the account's user and password and calls `wanpire_status`
 - **THEN** it gets the box's mode and broker
 
 ### Requirement: Runnable on a host over stdio
 
 `wanpire mcp --url <box>` SHALL run the same tools over stdio, calling the box's REST API at that
-URL with the token from `WANPIRE_TOKEN` or `--token-file`, and SHALL refuse to start without a
-token.
+URL with the account's user from `WANPIRE_USER` and its password from `WANPIRE_PASSWORD` or a
+file named by `--password-file`, and SHALL refuse to start without both.
 
-#### Scenario: No token
-- **GIVEN** no `WANPIRE_TOKEN` and no token file
+#### Scenario: No password
+- **GIVEN** `WANPIRE_USER` set, and no `WANPIRE_PASSWORD` and no password file
 - **WHEN** `wanpire mcp --url http://<pi-address>:8080` starts
-- **THEN** it exits with a message saying where the token goes
+- **THEN** it exits with a message saying where the user name and the password go

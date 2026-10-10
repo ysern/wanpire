@@ -8,15 +8,22 @@ takes it back out.
 ### Requirement: The install writes the box's files
 
 Run as root, `install/install.sh` SHALL install the packages, a virtual environment with
-wanpire in `/opt/wanpire/venv`, the configuration `/etc/wanpire/wanpire.json`, the token
-`/etc/wanpire/token` (mode 0600), the netplan drop-in `/etc/netplan/60-wanpire.yaml` and the
-unit `wanpire.service`, and SHALL enable and start the unit.
+wanpire in `/opt/wanpire/venv`, the configuration `/etc/wanpire/wanpire.json`, the netplan
+drop-in `/etc/netplan/60-wanpire.yaml` and the unit `wanpire.service`, and SHALL enable and start
+the unit. It SHALL write no credential unless asked: the box's account is made on the first visit
+to its web page. With `--user NAME` it SHALL set the account itself, reading the password from
+standard input, and SHALL then say so instead of pointing to the first visit.
 
 #### Scenario: A first install, roles given
 - **GIVEN** a box with `wlan0`, `eth0` and `eth1`
 - **WHEN** the script runs with `--control wlan0 --inbound eth0 --outbound eth1`
-- **THEN** the configuration maps those roles in bridge mode, the token has 64 hex digits and
-  mode 0600, and the unit is enabled
+- **THEN** the configuration maps those roles in bridge mode, no account exists, the unit is
+  enabled, and the script ends by saying to open the box's web page to make the account
+
+#### Scenario: The account given to the install
+- **GIVEN** a box with `wlan0`, `eth0` and `eth1`
+- **WHEN** the script runs with the roles and `--user admin`, the password on standard input
+- **THEN** `/etc/wanpire/account` holds `admin` and a hash of the password, never the password, in mode 0600
 
 ### Requirement: The roles are detected when not given
 
@@ -64,13 +71,15 @@ The unit SHALL run `wanpire reset`, which clears every configured outbound adapt
 
 ### Requirement: The install is idempotent
 
-A second run with the same arguments SHALL change no file, and SHALL keep the existing token and
-configuration.
+A second run with the same arguments SHALL change no file, and SHALL keep the existing account
+and configuration; `--user` on a box that has an account SHALL leave it alone and say how to
+change it (`wanpire account set`). An upgrade from a box with `/etc/wanpire/token` SHALL remove
+the token, which nothing reads any more.
 
 #### Scenario: Run twice
-- **GIVEN** a box installed once
+- **GIVEN** a box installed once, its account made on the first visit
 - **WHEN** the script runs again with the same arguments
-- **THEN** every file it wrote is byte for byte the same, the token included
+- **THEN** every file it wrote is byte for byte the same, and the account is untouched
 
 #### Scenario: Other roles on an installed box
 - **GIVEN** a box installed with outbound `eth1`

@@ -4,21 +4,50 @@ A web page on the box, a client of the REST API, from which a person drives the 
 
 ## ADDED Requirements
 
-### Requirement: The page is served by the box and needs the token for data
+### Requirement: The first visit makes the box's account
 
-The server SHALL serve the web UI's static files at `/` without the token. The page SHALL send
-the token with every call to `/api/v1`, and SHALL ask for it when it has none or when a call is
-refused with 401.
+The server SHALL serve the web UI's static files at `/` without credentials. When the box has no
+account, the page SHALL ask the person to make one, a user name, a password and the password
+again, and SHALL sign them in once it is made, as a home router does on its first visit. It
+SHALL say what is wrong with a password that is too short or not repeated the same, before
+sending anything.
 
-#### Scenario: A first visit
-- **GIVEN** a browser that has never opened the page
-- **WHEN** the person opens `/`
-- **THEN** the page asks for the token, and shows the status once a right one is given
+#### Scenario: A new box
+- **GIVEN** a box with no account
+- **WHEN** the person opens `/`, gives `admin` and the same password of 12 characters twice
+- **THEN** the account is made and the page shows the status, signed in as `admin`
 
-#### Scenario: A wrong token
-- **GIVEN** the page asking for the token
-- **WHEN** the person gives a wrong one
-- **THEN** the page says the token was refused and asks again
+#### Scenario: The passwords differ
+- **GIVEN** the page asking to make the account
+- **WHEN** the person gives two different passwords
+- **THEN** the page says they differ, and no account is made
+
+### Requirement: A person signs in with the user name and the password
+
+When the box has an account and the browser has no session, the page SHALL ask for the user name
+and the password. It SHALL keep no credential in the browser's storage: the session is a cookie
+the page cannot read. It SHALL ask again when a call is refused with 401. Settings SHALL let the
+person sign out and change the password.
+
+#### Scenario: Signing in
+- **GIVEN** the account `admin`
+- **WHEN** the person opens `/` and gives `admin` and its password
+- **THEN** the page shows the status
+
+#### Scenario: A wrong password
+- **GIVEN** the page asking to sign in
+- **WHEN** the person gives a wrong password
+- **THEN** the page says the user name or the password was refused and asks again
+
+#### Scenario: Coming back
+- **GIVEN** a person who signed in and closed the tab
+- **WHEN** they open `/` again in the same browser
+- **THEN** the page shows the status without asking
+
+#### Scenario: Signing out
+- **GIVEN** a signed-in page
+- **WHEN** the person presses Sign out in Settings
+- **THEN** the page asks to sign in, and a reload asks again
 
 ### Requirement: The status line shows the box at a glance
 
@@ -38,7 +67,7 @@ default chosen first. When both ends are chosen it SHALL show the link's figures
 REST API's preview, without changing the link.
 
 #### Scenario: London to Los Angeles
-- **GIVEN** the page with the token
+- **GIVEN** the page signed in
 - **WHEN** the person picks London for the near end and Los Angeles on 4G for the far end
 - **THEN** the page shows the delay and bandwidth both ways and the path's round trip, and the
   link is not changed

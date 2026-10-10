@@ -1,22 +1,75 @@
 ## Purpose
 
 The one way into wanpire's engine, for people (through the web UI), agents (through the MCP)
-and scripts alike, so that one token check and one broker apply to all of them.
+and scripts alike, so that one account check and one broker apply to all of them.
 
 ## ADDED Requirements
 
-### Requirement: Every route needs the token
+### Requirement: The box has one account, made on the first visit
 
-Every route under `/api/v1` SHALL require `Authorization: Bearer <token>` with the box's token,
-compared in constant time, and SHALL answer 401 without it.
+The box SHALL have one account, a user name and a password, kept on the box as a salted
+scrypt hash and never in clear. While it has none, `GET /api/v1/setup` SHALL say so without
+credentials, `POST /api/v1/setup` with `user` and `password` SHALL make it and sign the caller
+in, and every other route under `/api/v1` SHALL be answered 403 saying the account must be made
+first. Once the account exists, `POST /api/v1/setup` SHALL be answered 409. A password SHALL have
+at least 8 characters, and a user name SHALL be 1 to 32 letters, digits, dots, dashes or
+underscores; otherwise 422 with the reason.
 
-#### Scenario: No token
-- **WHEN** `GET /api/v1/status` is called without a token
+#### Scenario: The first visit
+- **GIVEN** a box with no account
+- **WHEN** `POST /api/v1/setup` is called with `admin` and a password of 12 characters
+- **THEN** the account is made, the answer is 201 and carries a session cookie
+- **AND** a second `POST /api/v1/setup` is answered 409
+
+#### Scenario: Before the account exists
+- **GIVEN** a box with no account
+- **WHEN** `GET /api/v1/status` is called
+- **THEN** the answer is 403 saying the account must be made first on the box's web page
+
+#### Scenario: A short password
+- **WHEN** `POST /api/v1/setup` is called with a password of 5 characters
+- **THEN** the answer is 422 naming the password's length, and no account is made
+
+### Requirement: Every route needs the account
+
+Every route under `/api/v1` but `setup` and `session` SHALL require the account: HTTP Basic
+credentials (`Authorization: Basic ...`), which agents and scripts send with every call, or the
+session cookie a browser got by signing in. A wrong or missing one SHALL be answered 401, and
+the user name and the password SHALL be compared in constant time.
+
+#### Scenario: No credentials
+- **WHEN** `GET /api/v1/status` is called without credentials
 - **THEN** the answer is 401 and nothing else is said
 
-#### Scenario: The right token
-- **WHEN** `GET /api/v1/status` is called with the token
+#### Scenario: Basic credentials
+- **WHEN** `GET /api/v1/status` is called with the account's user and password
 - **THEN** the answer is 200 with the mode, the outbound adapter, the link and the broker's holder and queue
+
+#### Scenario: A wrong password
+- **WHEN** `GET /api/v1/status` is called with the right user and a wrong password
+- **THEN** the answer is 401
+
+### Requirement: A browser signs in and out with a session
+
+`POST /api/v1/session` with `user` and `password` SHALL set an `HttpOnly`, `SameSite=Strict`
+session cookie and return the user name; `GET /api/v1/session` SHALL return the signed-in user
+or 401; `DELETE /api/v1/session` SHALL end the session. `PUT /api/v1/account/password` with the
+current and a new password SHALL change it and end every other session.
+
+#### Scenario: Signing in
+- **GIVEN** the account `admin`
+- **WHEN** a browser posts `admin` and its password to `/api/v1/session` and then reads the status
+- **THEN** the status is answered 200 on the cookie alone
+
+#### Scenario: Signing out
+- **GIVEN** a signed-in browser
+- **WHEN** it calls `DELETE /api/v1/session` and then reads the status
+- **THEN** the status is answered 401
+
+#### Scenario: Changing the password
+- **GIVEN** the account `admin`
+- **WHEN** the password is changed with the right current one
+- **THEN** the old password is refused and the new one accepted
 
 ### Requirement: Asking, polling and releasing the lease
 
@@ -81,10 +134,30 @@ holder SHALL renew the dead-man while a link is applied.
 
 ### Requirement: The server listens on the control address only
 
-`wanpire serve` SHALL listen on the control adapter's IPv4 address unless told another, and
-SHALL refuse to start without a token.
+`wanpire serve` SHALL listen on the control adapter's IPv4 address unless told another. It SHALL
+start without an account, and say in its log that the account is made on the box's web page or
+with `wanpire account`.
 
-#### Scenario: No token file
-- **GIVEN** no token at `/etc/wanpire/token`
+#### Scenario: No account yet
+- **GIVEN** no account at `/etc/wanpire/account`
 - **WHEN** `wanpire serve` starts
-- **THEN** it exits with a message saying the token is missing and how to make one
+- **THEN** it serves, logs that the account is still to be made, and answers the first visit's setup
+
+### Requirement: The account is set or removed on the box itself
+
+`wanpire account set <user>` SHALL set the account, reading the password from standard input,
+and `wanpire account reset` SHALL remove it, so that the next visit makes it again: the box's
+reset button, for a forgotten password. They are run over SSH on the box (`ssh <box> sudo
+wanpire account set admin`), which is how a forgotten password is recovered. Both SHALL need
+write access to the account file, and a running server SHALL see the change on its next call,
+without a restart.
+
+#### Scenario: A new password over SSH
+- **GIVEN** the account `admin`, its password forgotten
+- **WHEN** `sudo wanpire account set admin` is run over SSH with a new password on standard input
+- **THEN** the running server accepts the new password and refuses the old one
+
+#### Scenario: A forgotten password
+- **GIVEN** the account `admin`
+- **WHEN** `wanpire account reset` is run on the box and the web page is opened
+- **THEN** the page asks to make the account

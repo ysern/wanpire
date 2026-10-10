@@ -16,3 +16,9 @@
 
 - [x] 3.1 On the Pi against a namespace bed: an MCP client over HTTP leases, applies, reads the counters, releases
 - [x] 3.2 Journal, open questions, README
+
+## 4. The account (M7, the owner, 2026-10-11)
+
+- [ ] 4.1 Failing tests: `/mcp` without credentials 401, with the cookie alone 401, with Basic 200; the in-process client needs no password
+- [ ] 4.2 Failing tests: `wanpire mcp` without a user or a password refuses; with both, a stdio client calls status
+- [ ] 4.3 `mcp_server.py`, `api.py`, `cli.py` and `examples/mcp/` until green

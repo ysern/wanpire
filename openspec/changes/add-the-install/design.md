@@ -20,7 +20,7 @@ Debian package.
 ### I1. A shell script, steps in order, each one idempotent
 
 `install/install.sh [install|uninstall] [options]`, POSIX `sh` (dash on Ubuntu). Steps: check
-(root, apt, Python 3.12+, the roles), packages, the venv, the configuration, the token, the
+(root, apt, Python 3.12+, the roles), packages, the venv, the configuration, the account (I6), the
 netplan drop-in, the unit. Each step looks before it writes and writes only what differs, so a
 second run changes nothing and says "unchanged" for each step.
 
@@ -101,8 +101,25 @@ The real install is then tried once on the Pi with its real paths and systemd, b
 on a namespace test bed through a unit drop-in, since the second port is missing; nothing touches
 the real `eth0` or `wlan0` beyond the server listening on the control address.
 
+### I6. No token: the account on the first visit, or given (revised, the owner, 2026-10-11)
+
+The first version generated `/etc/wanpire/token` (64 hex digits, mode 0600) at install. The box
+now has one account instead (R6 of `add-the-rest-api`), made on the first visit to its web page,
+so the install writes no credential and ends by saying to open `http://<control-address>:8080/`
+and make it. `--user NAME` sets it at install, the password read from standard input and handed
+to `wanpire account set`, for a box that should not wait for a visit; the script never takes the
+password as an argument, where `ps` and the shell's history would see it. A box that already has
+an account keeps it; an old `/etc/wanpire/token` is removed. Under `--root` the account is
+written by the staging venv's `wanpire account set --file`, so the tests see the same file.
+
+Not taken: a random password printed at install (one more secret to copy off the console, which
+the first visit already avoids); a default password (an open box until someone changes it).
+
 ## Risks / Trade-offs
 
+- **The box is unclaimed from the install until the first visit.** → Anyone on the control
+  network could make the account first. `--user` closes that window, and the script's last line
+  says to visit at once.
 - **A wrong role on a remote box** could bridge away its only wired path. → The control adapter
   may not be a bridge port (A26), detection stops when unsure, and netplan is not applied unless
   asked.

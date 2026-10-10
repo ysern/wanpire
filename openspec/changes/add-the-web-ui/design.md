@@ -23,16 +23,26 @@ win. Plain JS (ES2020, `fetch`), a few hundred lines, readable without tooling.
 Not taken: a framework (React, Vue, htmx): a build step or a dependency for one page; server-side
 templates: the page would then be a second interface to the core instead of a client of the API.
 
-### U2. The token and the ticket in the browser
+### U2. The session and the ticket in the browser (revised, the owner, 2026-10-11)
 
-The page asks for the token once and keeps it in `localStorage`, so a phone does not ask every
-visit; "Forget token" removes it. The lease's ticket lives in `sessionStorage`, one per tab, so a
-second tab is a second client. Closing or reloading the page releases its lease (U3): a page that
-is not open cannot keep a link it is not watching. Static files, `/docs` and
-`/openapi.json` need no token: they hold no data, and the same text is in the source.
+The first version asked for the box's token and kept it in `localStorage`. The owner asked for a
+home router's way instead (R6 of `add-the-rest-api`): on a box with no account the page shows
+**Set up wanpire**, a user name, a password and the password again, checked in the page (8
+characters at least, the two the same) before it is sent; on a box with one it shows **Sign
+in**. Either ends in a session cookie the page cannot read, so the browser's storage holds no
+credential and a returning browser goes straight to the status. Settings / Access shows who is
+signed in, changes the password (the current one, the new one twice) and signs out.
 
-Not taken: a login cookie (a second way to authenticate, and agents do not keep cookies); guarding
-`/docs` (it hides nothing that is not public, and it is how a person learns the API).
+The broker's `who` is `web: <user>`, the account's name; the name typed beside the token is gone.
+The lease's ticket still lives in `sessionStorage`, one per tab, so a second tab is a second
+client. Closing or reloading the page releases its lease (U3): a page that is not open cannot keep
+a link it is not watching. Static files, `/docs` and `/openapi.json` need no credentials: they
+hold no data, and the same text is in the source.
+
+Not taken: the token in `localStorage` (superseded: a credential any script on the page could
+read, and one the owner did not want people to handle); keeping the typed name for `who` (one
+account names one owner, and the purpose already tells two people's tabs apart); guarding `/docs`
+(it hides nothing that is not public, and it is how a person learns the API).
 
 ### U3. Polling while open, releasing on close
 
@@ -77,7 +87,7 @@ The style is taken; nobody's brand is.
   counters, the box's state.
 - **Type.** System fonts (Helvetica Neue, Arial, system-ui), 14 px, 700 for titles; text a
   slate (`#36444b`), not black.
-- **Signing in.** The token is asked for on a centred white card of about 420 × 480 px with a
+- **Signing in.** Setting up and signing in (U2) are asked for on a centred white card of about 420 × 480 px with a
   large, soft halo tinted with the primary colour.
 - **Palette, wanpire's own.** The primary is a wine red, a vampire on the wire: a gradient from
   `#a0213a` to `#6e1022`, deep enough that white text passes WCAG AA on both ends (7.6:1 and
@@ -115,7 +125,7 @@ the page); Selenium (heavier, needs a driver installed separately).
 
 ## Risks / Trade-offs
 
-- **The token in `localStorage`** is readable by any script on the page. → The page loads no
-  third-party script; "Forget token" is there for a shared browser.
-- **Plain HTTP**: the token crosses the control network in clear. → As for the API (R5 of
-  `add-the-rest-api`): a trusted control network, or a reverse proxy with TLS.
+- **A session cookie on a shared browser** keeps the box open to the next person at it. →
+  Sign out is in Settings; the session ends when the server restarts.
+- **Plain HTTP**: the password crosses the control network in clear when signing in. → As for the
+  API (R6 of `add-the-rest-api`): a trusted control network, or a reverse proxy with TLS.
