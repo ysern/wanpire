@@ -19,5 +19,5 @@
 
 ## 4. No token (I6, the owner, 2026-10-11)
 
-- [ ] 4.1 Failing tests (staging root): no credential written; the last line points to the first visit; `--user` with the password on standard input writes the account hashed, mode 0600; a second run keeps it; an old token is removed
-- [ ] 4.2 `install/install.sh` until green
+- [x] 4.1 Failing tests (staging root): no credential written; the last line points to the first visit; `--user` with the password on standard input writes the account hashed, mode 0600; a second run keeps it; an old token is removed
+- [x] 4.2 `install/install.sh` until green

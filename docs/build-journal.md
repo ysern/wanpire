@@ -733,3 +733,28 @@ with an angry face, a red cape, a blue ring, cables draining from its fangs into
 became proposal D, drawn by hand like the others, with one change: the sketch carried the board
 maker's fruit, a trademark, and the logo shows a generic board. D's favicon, just the face, the
 fangs and three cables, still reads at 16 pixels, and it is now the page's icon.
+
+## 2026-10-11 — A router's first visit
+
+The token had to go. A 64-digit secret generated at install, copied off the box and pasted into
+every browser and every agent's configuration, is a developer's idea of convenience. The owner
+asked for a home router's instead: the box ships with no credentials, and the first visit to its
+page asks for a user name and a password, twice. After that, people and agents sign in with the
+same account.
+
+People get a session cookie the page cannot read, so the browser no longer keeps a secret any
+script could find. Agents send HTTP Basic on every call, which every HTTP client already does, so
+the API stays as stateless for them as it was. The password is stored as a salted scrypt hash. A
+verified pair is remembered in memory, so a Pi does not spend fifty milliseconds hashing on every
+poll. The MCP on the box calls the API in process with a credential made at start and never
+written down, and `/mcp` takes Basic only, never the cookie. A page from another site could make
+a signed-in browser send the cookie, but never the password.
+
+The router's reset button became `sudo wanpire account set` and `reset`, run over SSH. The
+server reads the account file again when it changes, so a new password counts from the next call,
+without a restart.
+
+That SSH path caught a bug on its first real run. A password piped into `ssh` from PowerShell
+arrived with three invisible bytes in front of it: a UTF-8 byte-order mark. The account was set,
+and nothing could sign in to it. The code stripped the line ending but not the mark. It strips
+both now, with a test that feeds it exactly what PowerShell sends.

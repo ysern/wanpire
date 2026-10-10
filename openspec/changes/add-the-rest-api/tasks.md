@@ -18,8 +18,8 @@
 
 ## 4. One account instead of the token (R6, the owner, 2026-10-11)
 
-- [ ] 4.1 Failing tests: the account file (set, verify, wrong password, reset, a change seen by a running server, mode 0600, never the password in clear)
-- [ ] 4.2 Failing tests: setup (needed, made once, 409 after, 403 elsewhere before it, 422 for a short password or a bad name)
-- [ ] 4.3 Failing tests: Basic (none, wrong, right); session (sign in, cookie alone, sign out, password change ends other sessions)
-- [ ] 4.4 Implement `account.py` and the routes until green; replace the token everywhere it was taken
-- [ ] 4.5 `wanpire account set|reset`; `serve` starts without an account
+- [x] 4.1 Failing tests: the account file (set, verify, wrong password, reset, a change seen by a running server, mode 0600, never the password in clear)
+- [x] 4.2 Failing tests: setup (needed, made once, 409 after, 403 elsewhere before it, 422 for a short password or a bad name)
+- [x] 4.3 Failing tests: Basic (none, wrong, right); session (sign in, cookie alone, sign out, password change ends other sessions)
+- [x] 4.4 Implement `account.py` and the routes until green; replace the token everywhere it was taken
+- [x] 4.5 `wanpire account set|reset`; `serve` starts without an account
