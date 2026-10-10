@@ -13,8 +13,8 @@ reversed). Answered questions stay, marked answered.
 | O1 👤 | **The USB 3 gigabit Ethernet adapter**: plugged into a blue USB 3 port, and its model, so the hardware run can measure it in bridge mode | Needed for the hardware run only; nothing else waits on it |
 | O2 👤 | **The GitHub account `wanpire` exists** (created 2023, one repository, no description). Not a project, not on PyPI or npm; the PyPI name `wanpire` is free | Keep the name; optionally reserve `wanpire` on PyPI before the first release. Recommendation: keep |
 | O3 👤 | **Ask RIPE NCC and WonderNetwork for permission to ship derived figures?** Their data may be read, not shipped (RIPE Atlas: commercial use needs prior permission, and MIT allows commercial use; WonderNetwork: "please reach out") | Not asking: they calibrate the formula only, which is what the design does now. Asking: a much wider shipped table. Recommendation: not now; the CC BY and CC0 sources suffice to start |
-| O5 👤 | **Pick the logo** from the three proposals in `docs/logo-proposals/` (A: the case biting a cable; B: the same with a cape's collar; C: a minimal head biting a plug), or ask for changes | Recommendation: B for the README and the article, its favicon for the page; A if the collar is too much |
 | O4 👤 | **Ookla Open Data is CC BY-NC-SA 4.0**: redistributable, but not under MIT | Read only (the design's choice); or ship it as a separate, separately licensed data package. Recommendation: read only |
+| O5 👤 | **Pick the logo** from the three proposals in `docs/logo-proposals/` (A: the case biting a cable; B: the same with a cape's collar; C: a minimal head biting a plug), or ask for changes | Recommendation: B for the README and the article, its favicon for the page; A if the collar is too much |
 
 ## Assumed
 
