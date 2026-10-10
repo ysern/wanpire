@@ -3,6 +3,7 @@
     wanpire adapters
     wanpire up                       (the mode in /etc/wanpire/wanpire.json)
     wanpire down
+    wanpire serve                    (the REST API, on the control adapter's address)
     wanpire endpoints
     wanpire preview london:consumer-fibre los-angeles:mobile-4g
     wanpire apply --adapter eth1 london:consumer-fibre los-angeles:mobile-4g
@@ -23,7 +24,7 @@ from dataclasses import fields
 from . import catalogue
 from .adapters import list_adapters
 from .config import DEFAULT_PATH, InvalidConfig, load_config
-from .engine import DEFAULT_LIFETIME_S, CommandFailed, Engine, RefusedAdapter
+from .engine import DEFAULT_LIFETIME_S, CommandFailed, Engine, RefusedAdapter, run
 from .model import Direction, InvalidLink, Link
 from .presets import InvalidPreset
 
@@ -32,6 +33,44 @@ _TEXT = {"distribution"}
 
 def make_engine(netns: str | None = None, control=()) -> Engine:
     return Engine(netns=netns, control_adapters=control)
+
+
+TOKEN_PATH = "/etc/wanpire/token"
+
+
+def control_address(adapter: str) -> str:
+    """The control adapter's first IPv4 address."""
+    for link in json.loads(run(["ip", "-j", "-4", "addr", "show", "dev", adapter]) or "[]"):
+        for addr in link.get("addr_info", []):
+            if addr.get("family") == "inet":
+                return addr["local"]
+    raise ValueError(f"the control adapter {adapter} has no IPv4 address to listen on")
+
+
+def _serve(a) -> int:
+    try:
+        with open(a.token_file, encoding="utf-8") as f:
+            token = f.read().strip()
+    except OSError:
+        token = ""
+    if not token:
+        raise ValueError(f"no token in {a.token_file}; make one: "
+                         f"openssl rand -hex 32 | sudo tee {a.token_file} && "
+                         f"sudo chmod 600 {a.token_file}")
+    import uvicorn
+
+    from .api import create_app
+    from .broker import Broker
+    adapters = None if a.netns else {x.name: x for x in list_adapters()}
+    cfg = load_config(a.config, adapters)
+    outbound = cfg.outbound[0]
+    engine = make_engine(netns=a.netns, control=[cfg.control])
+    broker = Broker(on_clear=lambda: engine.clear(outbound))
+    app = create_app(engine=engine, broker=broker, config=cfg, token=token,
+                     list_adapters=list_adapters)
+    host = a.host or control_address(cfg.control)
+    uvicorn.run(app, host=host, port=a.port, workers=1)
+    return 0
 
 
 def make_modes():
@@ -58,6 +97,12 @@ def _parser() -> argparse.ArgumentParser:
     ad = sub.add_parser("adapters", help="list the network adapters and their roles")
     ad.add_argument("--config", default=DEFAULT_PATH)
     ad.add_argument("--json", action="store_true", help="print JSON")
+    sv = sub.add_parser("serve", help="serve the REST API on the control adapter's address")
+    sv.add_argument("--config", default=DEFAULT_PATH)
+    sv.add_argument("--token-file", default=TOKEN_PATH)
+    sv.add_argument("--host", help="listen here instead of the control adapter's address")
+    sv.add_argument("--port", type=int, default=8080)
+    sv.add_argument("--netns", help="the namespace the outbound adapter lives in (test beds)")
     for name, text in (("up", "set up the configured mode (bridge or router)"),
                        ("down", "tear down whatever either mode set up")):
         m = sub.add_parser(name, help=text)
@@ -93,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
         if a.command == "adapters":
             _print_adapters(a.config, a.json)
             return 0
+        if a.command == "serve":
+            return _serve(a)
         if a.command in ("up", "down"):
             adapters = {x.name: x for x in list_adapters()}
             cfg = load_config(a.config, adapters)

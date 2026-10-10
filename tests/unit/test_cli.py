@@ -187,3 +187,25 @@ def test_up_refuses_an_invalid_mapping(box, capsys, tmp_path):
     assert cli.main(["up", "--config", str(bad)]) == 2
     assert "outbound shares its adapter with nothing" in capsys.readouterr().err
     assert calls == []
+
+
+# -- serve --------------------------------------------------------------------------------
+
+def test_serve_refuses_without_a_token(tmp_path, capsys):
+    assert cli.main(["serve", "--token-file", str(tmp_path / "none"),
+                     "--config", str(tmp_path / "none.json")]) == 2
+    err = capsys.readouterr().err
+    assert "token" in err and "openssl rand -hex 32" in err
+
+
+def test_the_control_address_is_read_from_ip(monkeypatch):
+    out = json.dumps([{"ifname": "wlan0", "addr_info": [
+        {"family": "inet", "local": "192.0.2.10", "prefixlen": 24}]}])
+    seen = []
+
+    def fake_run(argv, check=True, netns=None):
+        seen.append(argv)
+        return out
+    monkeypatch.setattr(cli, "run", fake_run)
+    assert cli.control_address("wlan0") == "192.0.2.10"
+    assert seen == [["ip", "-j", "-4", "addr", "show", "dev", "wlan0"]]

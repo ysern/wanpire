@@ -533,3 +533,26 @@ dead-man timer clears the line even if the server itself has died.
 
 The broker has no thread and never sleeps: the clock is passed in, and every call first works
 out what the passing time has done. Its 16 tests run in milliseconds by moving a fake clock.
+
+## 2026-10-10 — The REST API
+
+Everything so far is reachable through one HTTP interface, and nothing else will reach the
+engine: the web page and the MCP for agents will both be clients of it, so there is exactly one
+place where the token is checked and one broker deciding who drives.
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" -d '{"who":"me","purpose":"testing a call"}' \
+     -H 'content-type: application/json' http://<pi-address>:8080/api/v1/lease
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "X-Wanpire-Ticket: $TICKET" \
+     -H 'content-type: application/json' -d '{"near":"london","far":"new-york"}' \
+     http://<pi-address>:8080/api/v1/link
+```
+
+A design detail I like: the lease drives the dead-man. A link is applied with the lease's
+lifetime, and every poll from the holder renews both. An agent that keeps polling keeps its
+link; one that crashes loses the lease and the link on the same two-minute clock, and the link
+is cleared by a systemd timer even if the server itself has died.
+
+Tried for real on the Pi, against a namespace test bed: no token, 401; ask for the lease, get
+it; put London to New York; a ping across the box goes from 0.1 ms to 84 ms; release, and the
+link is gone. 179 unit tests run on the laptop in under four seconds.

@@ -14,7 +14,7 @@ controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports sho
 
 ## Status
 
-Early. The engine, the endpoint presets and a command line work; the web UI, the REST API and the MCP do not exist yet. What there is:
+Early. The engine, the endpoint presets, the two modes, the broker, the REST API and a command line work; the web UI and the MCP do not exist yet. What there is:
 
 - the design and the first measurements: [`openspec/changes/design-the-link-emulator/`](openspec/changes/design-the-link-emulator/)
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
@@ -45,6 +45,12 @@ The box sits on the line as a transparent bridge or as a router with NAT, set in
 sudo .venv/bin/wanpire up           # set up the configured mode
 sudo .venv/bin/wanpire down         # and take it off again
 ```
+
+The REST API (`wanpire serve`, on the control adapter's address, port 8080) needs the token in
+`/etc/wanpire/token` (`openssl rand -hex 32`, mode 0600). One client drives the link at a time:
+ask for a lease (`POST /api/v1/lease`), keep it by polling (`POST /api/v1/lease/poll`), change
+the link with its ticket (`PUT /api/v1/link`), release it (`DELETE /api/v1/lease`). The routes
+are listed in [`src/wanpire/api.py`](src/wanpire/api.py) and at `/docs` on the box.
 
 A link is cleared by itself after two minutes unless renewed (`wanpire renew`), so a
 forgotten one never lingers. Tests: `.venv/bin/pytest` (no root needed), and with real packets

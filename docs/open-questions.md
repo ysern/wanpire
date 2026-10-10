@@ -52,3 +52,6 @@ reversed). Answered questions stay, marked answered.
 | A31 ⚪ | When the link frees, the head of the queue holds the lease at once and its TTL starts then | Granting on its next poll (a second rule for the same thing) |
 | A32 ⚪ | The broker's state is in memory: a server restart ends every lease, and the boot-time clear leaves the line clean | Persisting leases to disk |
 | A33 ⚪ | If clearing the link fails when a lease ends, the lease still passes on and the error shows in the status; the dead-man still clears the line | Keeping the lease until the clear succeeds |
+| A34 ⚪ | The broker's ticket travels in an `X-Wanpire-Ticket` header; errors are JSON `{"error": ...}` with 401, 400 (no ticket), 404 (unknown ticket), 409 (not the holder), 410 (lease ended, said once), 422 (invalid), 500 (the engine failed) | The ticket as the bearer token; a cookie |
+| A35 ⚪ | A link is applied with the lease's TTL as its dead-man lifetime; each poll by the holder renews both, and a 5 s tick settles expired leases | A separate renew call for the dead-man |
+| A36 ⚪ | `wanpire serve` listens on port 8080 of the control adapter's IPv4 address, one worker, plain HTTP; TLS is left to a reverse proxy | Port 80 (needs nothing more as root, but clashes more often); TLS built in |
