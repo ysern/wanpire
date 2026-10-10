@@ -11,7 +11,7 @@
 - [x] 2.4 Netem-Q: default queue against a queue sized from delay and rate
 - [x] 2.5 Throughput and CPU, with and without long netem queues
 - [x] 2.6 The on-board port, router-with-NAT, from a workstation on the LAN, with a dead-man timer
-- [ ] 2.7 The USB adapter, bridge mode, two wired segments (needs the adapter plugged in; the hardware run)
+- [x] 2.7 The USB adapter, bridge mode, two wired segments (needs the adapter plugged in; the hardware run)
 
 ## 3. Calibration sources
 

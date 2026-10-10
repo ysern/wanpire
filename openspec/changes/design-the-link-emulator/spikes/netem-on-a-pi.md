@@ -1,6 +1,6 @@
 # Spike: a transparent bridge with netem on a Raspberry Pi 4
 
-**Status:** done, 2026-10-10. Namespaces and the on-board port measured; the USB adapter is still to come.
+**Status:** done, 2026-10-10. Namespaces, the on-board port, and the hardware run (bridge mode, the USB adapter, two wired segments) measured.
 
 ## Question
 
@@ -107,6 +107,35 @@ Neither fired.
     loss each way gave 4.1% round-trip loss (expected 3.96%). That LAN carried only 55 and 21
     Mbit/s, so it cannot measure the Pi's ceiling; that waits for two wired ports.
 
+**The hardware run** (2026-10-10): the installed box in bridge mode, the on-board port and an
+ASIX AX88179B USB 3 adapter, each on its own gigabit segment. The two ends were two Linux
+machines, one behind each port, so the Pi only forwarded. Everything went through the REST API
+under a lease, as a client would.
+
+14. **Clean, the box is a wire:** TCP at 933 and 940 Mbit/s, one way and the other; UDP at
+    818 Mbit/s with nothing dropped on the box. The base round trip is 1.8 to 2.5 ms. The kernel
+    drives the adapter with `cdc_ncm`, which reports "half duplex": cosmetic, since it carries
+    the line rate both ways.
+15. **Delay on the real ports is as exact as in namespaces.** 50 and 150 ms each way raised the
+    minimum round trip by 100.15 and 300.15 ms and the mean by 100.00 and 299.97 ms, mdev under
+    1 ms. The preset London to Sydney (139 ms each way, ±1.9 ms) measured 280.6 ms on average,
+    278 plus the line's own 2.
+16. **Loss is accurate, and goes the right way:** 2% *up* gave 2.02% from the device's side and
+    none back; 2% *down* gave 1.93% towards it and none away; over 31,000 packets each. wanpire's
+    `dropped` counter matched what the receiver missed.
+17. **A bandwidth holds:** 50 Mbit/s each way carried 47.4 and 47.5 Mbit/s of TCP goodput.
+18. **The ceiling under 150 ms each way is the *up* direction's, about 600 Mbit/s.** *Down*
+    (netem as the outbound port's root qdisc) forwarded 760 Mbit/s with not one packet lost on
+    the box. *Up* (netem on the `ifb` that outbound's ingress redirects to, then the bridge, then
+    inbound's own egress) lost nothing at 600 Mbit/s, 3% at 700 and 13% at 800, every drop in
+    inbound's default `fq_codel`; netem dropped none, softnet none, and with the link clear
+    818 Mbit/s crossed the same queue without a drop. netem releasing the `ifb`'s packets in
+    bursts that overrun a 5 ms CoDel target is the likely reading, not a proven one. A video
+    stream of 50 Mbit/s is a twelfth of it. Recorded as an open question.
+19. **Forwarding costs one core.** All of it ran in softirq on CPU 0 (70% averaged over a 12 s
+    window at 540 Mbit/s, the other three cores idle): one receive queue per adapter, no RPS. 300
+    MB of 900 used with 18,750-packet queues.
+
 ## Findings in full
 
 - **Disproven along the way:** the first loss runs reported `out_of_order = 0` for everything,
@@ -128,5 +157,20 @@ Neither fired.
   work, but needs the access point's cooperation.) And bridging the Wi-Fi and the Ethernet when
   both sit on the same LAN would join the LAN to itself in a loop. The bridge needs two wired
   ports on separate segments.
+
+- **The bridge took addresses of its own.** Installed, `wpbr0` came up with a link-local IPv6
+  address and two global ones from the line's router advertisements: the box was reachable, and
+  talking, on the line it should be invisible on. The namespace test checked global addresses
+  only, and its bed sends no advertisements. Fixed by switching IPv6 off on the bridge itself
+  (it still forwards IPv6 frames, checked by a ping across it), with a test that the bridge has
+  no IPv6 address at all.
+- **A port brought up by hand before the install gets an address.** Bringing the USB port up to
+  read its link let the kernel give it an IPv6 address by autoconfiguration; `wanpire up` then
+  refused it, as designed (A29). A reboot applied the install's netplan drop-in and the bridge
+  came up. Read a link with `ethtool` on a port that is down, or reboot after the install.
+- **Where a loss happened is read off counters, not the receiver.** The first 600 Mbit/s runs
+  lost 7 to 14% *up*, which looked like the box. The ports' counters showed every packet in and
+  out of the Pi; the receiving machine's `UdpRcvbufErrors` had them, and it lost as much with no
+  wanpire link at all. Only the runs above 600 Mbit/s lost on the box (finding 18).
 
 Raw output of every run is in the build journal's entries for 2026-10-09 and 2026-10-10.

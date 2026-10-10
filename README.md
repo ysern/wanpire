@@ -24,6 +24,23 @@ The reference build is a Raspberry Pi 4 with Ubuntu Server 24.04 LTS, its on-boa
 Ethernet port as the link in and a USB 3 gigabit Ethernet adapter as the link out,
 controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports should do.
 
+### Measured on the reference build
+
+A Pi 4 (1 GB) in bridge mode, its on-board port and an ASIX AX88179B USB 3 adapter on two
+gigabit segments, a machine behind each, driven through the REST API:
+
+| What | Asked | Measured |
+|---|---|---|
+| No link applied | — | TCP 933 / 940 Mbit/s each way; base round trip 1.8–2.5 ms |
+| Delay | 50 ms each way; 150 ms each way | round trip +100.0 ms; +300.0 ms (spread under 1 ms) |
+| A preset | London to Sydney, 139 ms each way | round trip 280.6 ms (278 + the line's 2) |
+| Loss | 2% one way | 2.02% and 1.93% over 31,000 packets, none the other way |
+| Bandwidth | 50 Mbit/s | 47.5 Mbit/s of TCP goodput |
+| Throughput through 150 ms each way | — | towards the device: 760 Mbit/s, nothing lost; away from it: 600 Mbit/s, nothing lost, then 3% lost at 700 |
+
+Forwarding runs on one of the four cores. How each figure was taken, and what is not yet
+understood about the last one, is in the spike's [findings](openspec/changes/design-the-link-emulator/spikes/netem-on-a-pi.md).
+
 ## Status
 
 Early. The engine, the endpoint presets, the two modes, the broker, the REST API, a web page, an MCP server for agents and a command line work. What there is:

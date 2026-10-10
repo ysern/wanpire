@@ -92,6 +92,20 @@ def test_bridge_a_device_reaches_the_other_side(modes):
     assert link["linkinfo"]["info_data"]["stp_state"] == 0
 
 
+def test_bridge_has_no_ipv6_of_its_own(modes):
+    # A router advertisement on the line would give the bridge a global address (seen on the
+    # hardware run); the kernel's link-local one shows the same thing without a router.
+    bridge_hosts()
+    modes.up(config("bridge"))
+    out = json.loads(ns(BOX, "ip", "-j", "-6", "addr", "show", "dev", "wpbr0"))
+    assert [a for i in out for a in i.get("addr_info", [])] == []
+    assert reaches(DUT, "10.98.0.2")
+    ns(DUT, "ip", "-6", "addr", "add", "fd98::1/64", "dev", "d0", "nodad")
+    ns(NET, "ip", "-6", "addr", "add", "fd98::2/64", "dev", "n0", "nodad")
+    assert " 0% packet loss" in ns(DUT, "ping", "-6", "-c", "2", "-i", "0.2", "-W", "1",
+                                   "fd98::2", check=False)
+
+
 def test_bridge_a_port_with_an_address_is_refused_and_kept(modes):
     from wanpire.modes import ModeRefused
     bridge_hosts()

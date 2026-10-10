@@ -1,6 +1,7 @@
 """Puts the box on the line in bridge or router-with-NAT mode, and takes it off again.
 
-- **Bridge:** inbound and outbound joined in a bridge, STP off, no address anywhere. A port
+- **Bridge:** inbound and outbound joined in a bridge, STP off, no address anywhere (IPv6 is
+  switched off on the bridge itself, which still forwards IPv6 frames). A port
   that carries an address is refused, never stripped (stripping could cut the session).
 - **Router with NAT:** outbound gets an address on a private network of its own and a DHCP
   server (dnsmasq, bound to outbound only); an nftables table of wanpire's own forwards
@@ -104,6 +105,9 @@ class Modes:
             if br is None:
                 ipr.link("add", ifname=cfg.bridge_name, kind="bridge", br_stp_state=0)
                 br = self._index(ipr, cfg.bridge_name)
+            # The box's own IPv6 stack, not the bridging: else the bridge takes a link-local
+            # address, and a global one from any router advertisement on the line.
+            self._run(["sysctl", "-qw", f"net.ipv6.conf.{cfg.bridge_name}.disable_ipv6=1"])
             for name, _ in ports:
                 ipr.link("set", index=idx[name], master=br)
                 ipr.link("set", index=idx[name], state="up")

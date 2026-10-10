@@ -692,3 +692,38 @@ the repository; legible at 16 pixels and in one colour. Each proposal is three h
 in the web page's wine red and amber: full colour, one colour, and a favicon redrawn on a
 32-pixel grid, since a scaled-down drawing turns to mush at that size. A contact sheet shows them
 all at 128, 32 and 16 px on light and dark. They wait for the owner to pick one.
+
+## 2026-10-10 — On the wire at last
+
+The USB adapter arrived and went in: an ASIX AX88179B, gigabit, in one of the Pi's blue USB 3
+ports. The Pi went between a machine and the switch it used to plug into, its on-board port on
+the machine's side and the adapter on the switch's. One more cable came out of the drawer too:
+the on-board port, which had linked at 100 Mbit/s all along, now linked at a gigabit.
+
+The install ran, and the service refused to start. The bridge's ports must carry no address,
+and the adapter had one: an IPv6 address the kernel gave it by itself, because it had been
+brought up by hand a few minutes earlier to read its link. The refusal was the design working.
+The install's network settings take effect at boot, so the Pi rebooted, came back over its
+Wi-Fi, and the bridge was up and forwarding.
+
+Then the bridge was found with addresses of its own: a link-local one, and two global ones
+from the router's advertisements on the line. A box that is meant to be a wire was answering on
+it. The namespace tests had never seen it, because nothing in them advertises a router. A new
+test now says the bridge has no IPv6 address at all, not even link-local; it failed, IPv6 was
+switched off on the bridge, it passed, and a ping over IPv6 still crossed.
+
+The measurements, with a machine behind each port so the Pi only forwards:
+
+- **With no link applied, the box is a wire:** 933 and 940 Mbit/s of TCP, one way and the other.
+- **Delay is exact:** 150 ms each way added 300.0 ms to the round trip, give or take a fraction.
+  London to Sydney, from the presets, measured 280.6 ms: the 278 promised plus the line's own 2.
+- **Loss is accurate and directional:** 2% asked, 2.02% and 1.93% measured, none the other way.
+- **A bandwidth holds:** 50 Mbit/s carried 47.5 of TCP.
+- **The ceiling, through 150 ms each way:** 760 Mbit/s towards the device without one packet
+  lost on the box; about 600 the other way, above which the outgoing port's own queue starts to
+  drop.
+
+One false lead on the way: the first fast runs lost 7 to 14% and looked like the Pi. The
+ports' counters said every packet entered the Pi and left it. The receiving machine's own
+socket buffer was overflowing, and it did the same with no link applied at all. Count at the
+box, not at the receiver.
