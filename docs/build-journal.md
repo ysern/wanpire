@@ -727,3 +727,9 @@ One false lead on the way: the first fast runs lost 7 to 14% and looked like the
 ports' counters said every packet entered the Pi and left it. The receiving machine's own
 socket buffer was overflowing, and it did the same with no link applied at all. Count at the
 box, not at the receiver.
+
+The owner did not pick any of the three. They sent a sketch of their own instead: a green board
+with an angry face, a red cape, a blue ring, cables draining from its fangs into packets. It
+became proposal D, drawn by hand like the others, with one change: the sketch carried the board
+maker's fruit, a trademark, and the logo shows a generic board. D's favicon, just the face, the
+fangs and three cables, still reads at 16 pixels, and it is now the page's icon.

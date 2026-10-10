@@ -6,7 +6,7 @@ along the sides; the lid is the face; two fangs bite into an Ethernet cable and 
 into the mouth. No product's name or mark. Colours from the web page: wine red `#a0213a` /
 `#6e1022`, amber `#f2b134`, the case's grey `#c9ccd1` and near-black `#1d1f22`.
 
-**The owner picks one (or asks for changes); until then the web page keeps a placeholder.**
+**The owner picked D, the emblem (2026-10-10).** Its favicon is the web page's icon and header mark; its full form heads the README. A to C stay here as the record of what was offered.
 
 | | Full colour | One colour | Favicon |
 |---|---|---|---|

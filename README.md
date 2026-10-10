@@ -1,5 +1,7 @@
 # wanpire
 
+<img src="docs/logo-proposals/d-emblem-full.svg" width="160" alt="wanpire's logo: a small board as a caped vampire, biting the line">
+
 **A small box on your Ethernet line that makes it behave like a long internet link.**
 
 wanpire sits between your device and the rest of the network and adds what a long
