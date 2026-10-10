@@ -1,8 +1,16 @@
 """wanpire's REST API: the engine's only interface. The web UI and the MCP are its clients.
 
-Every route under ``/api/v1`` needs the box's bearer token. Changes to the link need the
+The box has one account (``account.py``). Until it exists only ``setup`` answers, and the
+first visit makes it; afterwards every route under ``/api/v1`` needs it, in HTTP Basic
+credentials (agents, scripts) or a browser's session cookie. Changes to the link need the
 broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ticket.
 
+    GET    /api/v1/setup             {"needed"}: whether the box still has no account
+    POST   /api/v1/setup             {"user", "password"}: make it, once; signs the browser in
+    POST   /api/v1/session           {"user", "password"}: sign a browser in (a cookie)
+    GET    /api/v1/session           who is signed in
+    DELETE /api/v1/session           sign out
+    PUT    /api/v1/account/password  {"current", "new"}: ends every other session
     GET    /api/v1/status            mode, outbound adapter, link counters, holder and queue
     POST   /api/v1/lease             {"who", "purpose"} -> ticket, holds, position
     POST   /api/v1/lease/poll        keep the ticket alive (renews the dead-man for the holder)
@@ -17,15 +25,19 @@ broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ti
     GET    /api/v1/adapters          every adapter, its facts and its role
     POST   /mcp                      the MCP (streamable HTTP), its tools calling the routes above
 
-The web UI's static files are served at ``/`` without the token: they hold no data, and the
-page itself calls the routes above with the token.
+The web UI's static files are served at ``/`` without credentials: they hold no data, and the
+page itself calls the routes above with its session.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import contextlib
 import secrets
+import threading
+import time
 from pathlib import Path
 
 from fastapi import Body, Depends, FastAPI, Header, Request
@@ -34,6 +46,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.routing import Route
 
 from . import catalogue
+from .account import Account, InvalidAccount, check
 from .broker import Broker, LeaseEnded, NotHolder, UnknownTicket
 from .config import Config, InvalidConfig
 from .engine import CommandFailed, RefusedAdapter
@@ -41,7 +54,10 @@ from .model import InvalidLink, Link
 from .presets import InvalidPreset
 
 TICKET = "X-Wanpire-Ticket"
+COOKIE = "wanpire_session"
 WEB = Path(__file__).parent / "web"
+NO_ACCOUNT = ("the box has no account yet: open its web page to make one, "
+              "or run `sudo wanpire account set <user>` on the box")
 
 
 class _Status(Exception):
@@ -50,30 +66,42 @@ class _Status(Exception):
         self.code = code
 
 
+def _basic(authorization: str | None) -> tuple[str, str] | None:
+    """The user and password of an ``Authorization: Basic`` header, or None."""
+    scheme, _, value = (authorization or "").partition(" ")
+    if scheme.lower() != "basic":
+        return None
+    try:
+        user, sep, password = base64.b64decode(value.strip(), validate=True).decode().partition(":")
+    except (binascii.Error, UnicodeDecodeError):
+        return None
+    return (user, password) if sep else None
+
+
 def _mcp_http_handler(mcp):
     """The SDK's streamable HTTP handler for ``mcp``: stateless, JSON answers."""
     from mcp.server.transport_security import TransportSecuritySettings
     http = mcp.streamable_http_app(
         streamable_http_path="/mcp", stateless_http=True, json_response=True,
-        # the bearer token stops a browser without it; the host check would only refuse
-        # the box's own name and addresses
+        # /mcp takes Basic only, never the web page's cookie, so another site's page cannot
+        # ride a signed-in browser; the host check would only refuse the box's own names
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
     return next(r.endpoint for r in http.routes if getattr(r, "path", None) == "/mcp")
 
 
 class _Guard:
-    """An ASGI app: the box's bearer token, then the MCP's handler."""
+    """An ASGI app: the box's account in Basic credentials, then the MCP's handler."""
 
-    def __init__(self, token: str, handler: list):
-        self._token = token.encode()
+    def __init__(self, allowed, handler: list):
+        self._allowed = allowed  # a callable(authorization header) -> None, raising _Status
         self._handler = handler
 
     async def __call__(self, scope, receive, send):
-        given = dict(scope.get("headers") or []).get(b"authorization", b"")
-        scheme, _, value = given.partition(b" ")
-        if scheme.lower() != b"bearer" or not secrets.compare_digest(value, self._token):
-            await JSONResponse({"error": "a bearer token is needed"}, status_code=401)(
-                scope, receive, send)
+        given = dict(scope.get("headers") or []).get(b"authorization", b"").decode("latin-1")
+        try:
+            await asyncio.to_thread(self._allowed, given)
+        except _Status as e:
+            await JSONResponse({"error": str(e)}, status_code=e.code)(scope, receive, send)
             return
         if not self._handler:
             await JSONResponse({"error": "the MCP is starting"}, status_code=503)(
@@ -82,11 +110,46 @@ class _Guard:
         await self._handler[0](scope, receive, send)
 
 
-def create_app(engine, broker: Broker, config: Config, token: str, list_adapters,
-               tick_s: float | None = 5.0, with_mcp: bool = True) -> FastAPI:
-    if not token:
-        raise ValueError("the API needs a token")
+def create_app(engine, broker: Broker, config: Config, account: Account, list_adapters,
+               tick_s: float | None = 5.0, with_mcp: bool = True,
+               fail_delay_s: float = 0.5) -> FastAPI:
     outbound = config.outbound[0]
+    # the MCP on the box calls the routes in process with this, made here and never written
+    internal = secrets.token_urlsafe(32)
+    sessions: dict[str, tuple] = {}  # session id -> the account's generation it was made under
+    sessions_lock = threading.Lock()
+
+    def refused(message: str = "the box's user name and password are needed"):
+        if fail_delay_s:
+            time.sleep(fail_delay_s)  # slows guessing; no lockout a stranger could trigger
+        return _Status(401, message)
+
+    def session_user(sid: str | None) -> str | None:
+        if not sid:
+            return None
+        with sessions_lock:
+            gen = sessions.get(sid)
+        if gen is None or gen != account.generation:
+            return None
+        return account.user
+
+    def new_session(response: Response) -> None:
+        sid = secrets.token_urlsafe(32)
+        with sessions_lock:
+            sessions[sid] = account.generation
+        response.set_cookie(COOKIE, sid, httponly=True, samesite="strict", path="/")
+
+    def basic_or_internal(authorization: str) -> None:
+        if not account.exists():
+            raise _Status(403, NO_ACCOUNT)
+        scheme, _, value = authorization.partition(" ")
+        if scheme.lower() == "bearer" and secrets.compare_digest(value.encode(), internal.encode()):
+            return
+        pair = _basic(authorization)
+        if pair is None:
+            raise _Status(401, "the box's user name and password are needed")
+        if not account.verify(*pair):
+            raise refused("the user name or the password was refused")
 
     mcp = None
     mcp_handler = []  # the MCP's HTTP handler, made afresh each time the app starts
@@ -121,16 +184,18 @@ def create_app(engine, broker: Broker, config: Config, token: str, list_adapters
 
     for exc, code in ((UnknownTicket, 404), (NotHolder, 409), (LeaseEnded, 410),
                       (InvalidLink, 422), (InvalidPreset, 422), (InvalidConfig, 422),
-                      (RefusedAdapter, 422), (CommandFailed, 500)):
+                      (RefusedAdapter, 422), (CommandFailed, 500), (InvalidAccount, 422)):
         def handler(_r: Request, e: Exception, code=code):
             return error(code, str(e))
         app.add_exception_handler(exc, handler)
 
-    def authorised(authorization: str | None = Header(default=None)) -> None:
-        scheme, _, given = (authorization or "").partition(" ")
-        if scheme.lower() != "bearer" or not secrets.compare_digest(given.encode(),
-                                                                     token.encode()):
-            raise _Status(401, "a bearer token is needed")
+    def authorised(request: Request, authorization: str | None = Header(default=None)) -> None:
+        if not account.exists():
+            raise _Status(403, NO_ACCOUNT)
+        if authorization:
+            basic_or_internal(authorization)
+        elif session_user(request.cookies.get(COOKIE)) is None:
+            raise _Status(401, "the box's user name and password are needed")
 
     def ticket_of(x_wanpire_ticket: str | None = Header(default=None)) -> str:
         if not x_wanpire_ticket:
@@ -143,6 +208,68 @@ def create_app(engine, broker: Broker, config: Config, token: str, list_adapters
     def answer(a) -> dict:
         return {"ticket": a.ticket, "holds": a.holds, "position": a.position,
                 "expires_in_s": a.expires_in_s}
+
+    # -- the account ----------------------------------------------------------------------
+
+    def credentials(body: dict) -> tuple[str, str]:
+        return str(body.get("user") or ""), str(body.get("password") or "")
+
+    @app.get(f"{api}/setup")
+    def setup_needed():
+        return {"needed": not account.exists()}
+
+    @app.post(f"{api}/setup", status_code=201)
+    def setup(response: Response, body: dict = Body(...)):
+        if account.exists():
+            raise _Status(409, "the box has an account already; sign in")
+        user, password = credentials(body)
+        check(user, password)
+        if not account.create(user, password):
+            raise _Status(409, "the box has an account already; sign in")
+        new_session(response)
+        return {"user": user}
+
+    @app.post(f"{api}/session")
+    def sign_in(response: Response, body: dict = Body(...)):
+        if not account.exists():
+            raise _Status(403, NO_ACCOUNT)
+        if not account.verify(*credentials(body)):
+            raise refused("the user name or the password was refused")
+        new_session(response)
+        return {"user": account.user}
+
+    @app.get(f"{api}/session")
+    def signed_in(request: Request):
+        user = session_user(request.cookies.get(COOKIE))
+        if user is None:
+            if not account.exists():
+                raise _Status(403, NO_ACCOUNT)
+            raise _Status(401, "not signed in")
+        return {"user": user}
+
+    @app.delete(f"{api}/session", status_code=204)
+    def sign_out(request: Request):
+        with sessions_lock:
+            sessions.pop(request.cookies.get(COOKIE) or "", None)
+        r = Response(status_code=204)
+        r.delete_cookie(COOKIE, path="/")
+        return r
+
+    @app.put(f"{api}/account/password", dependencies=auth)
+    def change_password(request: Request, body: dict = Body(...)):
+        current, new = str(body.get("current") or ""), str(body.get("new") or "")
+        user = account.user
+        if not account.verify(user, current):
+            raise refused("the current password was refused")
+        account.set(user, new)  # raises InvalidAccount (422) for a short one
+        r = Response(status_code=204)
+        with sessions_lock:
+            sessions.clear()  # every session but this one ends: they were under the old one
+        if request.cookies.get(COOKIE):
+            new_session(r)
+        return r
+
+    # -- the box ----------------------------------------------------------------------------
 
     @app.get(f"{api}/status", dependencies=auth)
     def status():
@@ -238,10 +365,10 @@ def create_app(engine, broker: Broker, config: Config, token: str, list_adapters
         import httpx
 
         from .mcp_server import make_mcp, rest_client
-        mcp = make_mcp(rest_client("http://wanpire", token,
+        mcp = make_mcp(rest_client("http://wanpire", bearer=internal,
                                    transport=httpx.ASGITransport(app=app)))
         app.state.mcp = mcp
-        app.router.routes.append(Route("/mcp", endpoint=_Guard(token, mcp_handler)))
+        app.router.routes.append(Route("/mcp", endpoint=_Guard(basic_or_internal, mcp_handler)))
 
     # last, so /api/v1, /mcp, /docs and /openapi.json win
     app.mount("/", StaticFiles(directory=WEB, html=True), name="web")

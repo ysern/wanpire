@@ -48,10 +48,11 @@ def box(tmp_path):
     root.mkdir()
     sysfs = fake_sysfs(tmp_path, PI)
 
-    def run(*args, sysfs_dir=sysfs, check=True):
+    def run(*args, sysfs_dir=sysfs, check=True, stdin=""):
         r = subprocess.run(["sh", str(SCRIPT), *args, "--root", str(root), "--no-venv",
                             "--sysfs", str(sysfs_dir)],
-                           capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, timeout=60, input=stdin,
+                           env={**os.environ, "PYTHON": sys.executable})
         if check:
             assert r.returncode == 0, r.stdout + r.stderr
         return r
@@ -77,13 +78,51 @@ def test_a_first_install_with_roles(box):
     cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
     assert cfg == {"schema": "wanpire-config/1", "mode": "bridge",
                    "adapters": {"control": "wlan0", "inbound": "eth0", "outbound": ["eth1"]}}
-    token = box.root / "etc/wanpire/token"
-    assert len(token.read_text().strip()) == 64
-    int(token.read_text().strip(), 16)
-    assert mode(token) == 0o600
     unit = (box.root / "etc/systemd/system/wanpire.service").read_text()
     assert "ExecStart=/opt/wanpire/venv/bin/wanpire serve" in unit
     assert (box.root / "etc/systemd/system/multi-user.target.wants/wanpire.service").is_symlink()
+
+
+def test_a_first_install_writes_no_credential(box):
+    r = box(*ROLES)
+    assert not (box.root / "etc/wanpire/token").exists()
+    assert not (box.root / "etc/wanpire/account").exists()
+    last = r.stdout.strip().splitlines()[-1]
+    assert "account" in last and ":8080/" in last and "wanpire account set" in last
+
+
+def test_the_account_given_to_the_install(box):
+    from wanpire.account import Account
+    r = box(*ROLES, "--user", "admin", stdin="correct horse\n")
+    account = box.root / "etc/wanpire/account"
+    assert Account(account).verify("admin", "correct horse")
+    assert "correct horse" not in account.read_text()
+    assert mode(account) == 0o600
+    assert "none yet" not in r.stdout
+
+
+def test_a_second_install_keeps_the_account(box):
+    from wanpire.account import Account
+    box(*ROLES, "--user", "admin", stdin="correct horse\n")
+    before = (box.root / "etc/wanpire/account").read_bytes()
+    r = box(*ROLES, "--user", "eve", stdin="battery staple\n")
+    assert (box.root / "etc/wanpire/account").read_bytes() == before
+    assert "wanpire account set" in r.stdout
+    assert Account(box.root / "etc/wanpire/account").user == "admin"
+
+
+def test_a_short_password_given_to_the_install_stops_it(box):
+    r = box(*ROLES, "--user", "admin", stdin="short\n", check=False)
+    assert r.returncode != 0
+    assert "8 characters" in r.stderr
+    assert not (box.root / "etc/wanpire/account").exists()
+
+
+def test_an_old_token_is_removed(box):
+    (box.root / "etc/wanpire").mkdir(parents=True)
+    (box.root / "etc/wanpire/token").write_text("ab" * 32 + "\n")
+    box(*ROLES)
+    assert not (box.root / "etc/wanpire/token").exists()
 
 
 def test_the_unit_clears_before_it_sets_up_and_serves(box):
@@ -184,10 +223,10 @@ def test_without_root_or_a_staging_root_refused():
 # -- uninstall ------------------------------------------------------------------------------
 
 def test_uninstall_keeps_the_configuration(box):
-    box(*ROLES)
+    box(*ROLES, "--user", "admin", stdin="correct horse\n")
     box("uninstall")
     left = files(box.root)
-    assert set(left) == {"etc/wanpire/wanpire.json", "etc/wanpire/token"}
+    assert set(left) == {"etc/wanpire/wanpire.json", "etc/wanpire/account"}
     assert not (box.root / "etc/systemd/system/multi-user.target.wants/wanpire.service").exists()
     assert not (box.root / "opt/wanpire").exists()
 
@@ -199,12 +238,12 @@ def test_uninstall_purge(box):
     assert not (box.root / "etc/wanpire").exists()
 
 
-def test_install_after_uninstall_keeps_the_token(box):
-    box(*ROLES)
-    token = (box.root / "etc/wanpire/token").read_text()
+def test_install_after_uninstall_keeps_the_account(box):
+    box(*ROLES, "--user", "admin", stdin="correct horse\n")
+    account = (box.root / "etc/wanpire/account").read_text()
     box("uninstall")
     box(*ROLES)
-    assert (box.root / "etc/wanpire/token").read_text() == token
+    assert (box.root / "etc/wanpire/account").read_text() == account
 
 
 def test_no_check_installs_roles_not_plugged_in(box):

@@ -17,13 +17,14 @@ Directions are seen from the device under test: **down** is towards it, **up** a
 ## 1. Make sure the MCP is registered
 
 Look for tools named `wanpire_*`. If there are none, register the MCP as `wanpire`, one of two
-ways (the box's token is in `/etc/wanpire/token` on the box; ask your user for it and for the
-box's address, never guess them):
+ways. The box has one account, a user name and a password, made on the first visit to its web
+page; ask your user for it and for the box's address, never guess them. If the box answers that
+it has no account yet, ask your user to open its web page and make one.
 
-- **On the box (preferred):** streamable HTTP at `http://<box>:8080/mcp`, with the header
-  `Authorization: Bearer <token>`. Nothing to install.
-- **On this machine, over stdio:** `wanpire mcp --url http://<box>:8080`, with the token in
-  `WANPIRE_TOKEN`. Needs wanpire installed here.
+- **On the box (preferred):** streamable HTTP at `http://<box>:8080/mcp`, with HTTP Basic
+  credentials: the header `Authorization: Basic <base64 of user:password>`. Nothing to install.
+- **On this machine, over stdio:** `wanpire mcp --url http://<box>:8080`, with the user name in
+  `WANPIRE_USER` and the password in `WANPIRE_PASSWORD`. Needs wanpire installed here.
 
 Reading needs no lease: `wanpire_status` (mode, holder, queue, counters), `wanpire_endpoints`,
 `wanpire_describe`, `wanpire_counters`.
@@ -99,4 +100,4 @@ The tools' errors say what happened and what to do:
 - **Never end another client's lease**, and never ask a person to do it for you to jump the
   queue. If you have waited long, tell your user who holds the link and for what.
 - One ticket per task. Do not ask for the link twice in parallel.
-- Never share the token in output, logs or commits.
+- Never share the password in output, logs or commits.

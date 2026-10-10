@@ -10,20 +10,34 @@
 </head>
 <body>
 
-<!-- Signing in: the box's token, once -->
+<!-- The first visit makes the box's account; afterwards, signing in with it -->
 <div id="signin-wrap" class="signin-wrap" hidden>
-  <form id="signin" class="signin">
+  <form id="setup" class="signin" hidden novalidate>
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-mark"/></svg>
+    <h1>Set up wanpire</h1>
+    <p class="lead">This box has no account yet. Choose the user name and the password that
+      people and agents will sign in with.</p>
+    <label for="setup-user">User name:</label>
+    <input id="setup-user" type="text" autocomplete="username" value="admin" required>
+    <label for="setup-password">Password:</label>
+    <input id="setup-password" type="password" autocomplete="new-password" required>
+    <p class="help">At least 8 characters.</p>
+    <label for="setup-again">Password again:</label>
+    <input id="setup-again" type="password" autocomplete="new-password" required>
+    <button id="setup-save" type="submit" class="primary">Save and sign in</button>
+    <p id="setup-error" class="bad" role="alert"></p>
+  </form>
+  <form id="signin" class="signin" hidden>
     <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-mark"/></svg>
     <h1>wanpire</h1>
-    <p class="lead">Sign in to the link emulator with the box's token.</p>
-    <label for="token">Token:</label>
-    <input id="token" type="password" autocomplete="current-password" required>
-    <p class="help">It is in <code>/etc/wanpire/token</code> on the box.</p>
-    <label for="name">Your name:</label>
-    <input id="name" type="text" autocomplete="nickname" required>
-    <p class="help">Others see you as "web: <em>name</em>".</p>
-    <button id="token-save" type="submit" class="primary">Sign in</button>
-    <p id="token-error" class="bad" role="alert"></p>
+    <p class="lead">Sign in to the link emulator.</p>
+    <label for="user">User name:</label>
+    <input id="user" type="text" autocomplete="username" required>
+    <label for="password">Password:</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <p class="help">Forgotten? On the box, over SSH: <code>sudo wanpire account set &lt;user&gt;</code>.</p>
+    <button id="signin-save" type="submit" class="primary">Sign in</button>
+    <p id="signin-error" class="bad" role="alert"></p>
   </form>
 </div>
 
@@ -194,12 +208,32 @@
       <div class="page" id="page-settings-access" hidden>
         <section class="panel">
           <div class="head"><h2>Access</h2><a class="action" href="docs">API reference</a></div>
-          <p class="desc">How this browser signs in to the box.</p>
+          <p class="desc">The box's one account, for people here and for agents through the API and the MCP.</p>
           <dl class="card">
-            <div><dt>Your name:</dt><dd id="me">-</dd></div>
-            <div><dt>Token:</dt><dd>kept in this browser</dd></div>
+            <div><dt>Signed in as:</dt><dd id="me">-</dd></div>
           </dl>
-          <div class="buttons"><button id="forget" type="button" class="secondary">Forget the token</button></div>
+          <div class="buttons"><button id="signout" type="button" class="secondary">Sign out</button></div>
+        </section>
+
+        <section class="panel">
+          <div class="head"><h2>Change the password</h2></div>
+          <p class="desc">Every other browser is signed out; agents need the new password too.</p>
+          <form id="pw-form" class="form" novalidate>
+            <label for="pw-current">Current password:</label>
+            <div class="control"><input id="pw-current" type="password" autocomplete="current-password"></div>
+            <label for="pw-new">New password:</label>
+            <div class="control">
+              <input id="pw-new" type="password" autocomplete="new-password">
+              <p class="help">At least 8 characters.</p>
+            </div>
+            <label for="pw-again">New password again:</label>
+            <div class="control"><input id="pw-again" type="password" autocomplete="new-password"></div>
+            <span></span>
+            <div class="control">
+              <button id="pw-save" type="submit" class="primary">Change</button>
+              <p id="pw-message" class="help" role="status"></p>
+            </div>
+          </form>
         </section>
       </div>
 

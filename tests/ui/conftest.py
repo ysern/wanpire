@@ -3,9 +3,12 @@ and a headless browser. Skipped where Playwright or its browser is missing."""
 
 from __future__ import annotations
 
+import base64
 import socket
+import tempfile
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -16,12 +19,14 @@ try:
 except ImportError:  # no Playwright here (pip install -e ".[ui-test]"): skip the page tests
     collect_ignore_glob = ["test_*.py"]
 
+from wanpire.account import Account  # noqa: E402
 from wanpire.adapters import Adapter  # noqa: E402
 from wanpire.api import create_app  # noqa: E402
 from wanpire.broker import Broker  # noqa: E402
 from wanpire.config import config_from_dict  # noqa: E402
 
-TOKEN = "t0ken"
+USER, PASSWORD = "admin", "correct horse"
+AUTH = {"Authorization": "Basic " + base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()}
 LEASE_TTL_S = 3.0  # the page polls at a third of it: once a second
 
 ADAPTERS = [Adapter("eth0", "ethernet", "aa:bb:cc:dd:ee:01", "up", 1000, False),
@@ -59,12 +64,16 @@ class RecordingEngine:
 
 
 class Box:
-    def __init__(self):
+    def __init__(self, with_account=True):
         self.engine = RecordingEngine()
         self.broker = Broker(on_clear=lambda: self.engine.clear("eth1"),
                              lease_ttl_s=LEASE_TTL_S, queue_ttl_s=LEASE_TTL_S)
-        app = create_app(engine=self.engine, broker=self.broker, config=CONFIG, token=TOKEN,
-                         list_adapters=lambda: ADAPTERS, tick_s=None)
+        self.account = Account(Path(tempfile.mkdtemp()) / "account")
+        if with_account:
+            self.account.set(USER, PASSWORD)
+        app = create_app(engine=self.engine, broker=self.broker, config=CONFIG,
+                         account=self.account, list_adapters=lambda: ADAPTERS, tick_s=None,
+                         fail_delay_s=0)
         with socket.socket() as s:
             s.bind(("127.0.0.1", 0))
             self.port = s.getsockname()[1]
@@ -106,18 +115,39 @@ def box():
 
 
 @pytest.fixture
-def page(browser, box):
+def new_box():
+    """A box as installed: no account yet."""
+    b = Box(with_account=False)
+    b.start()
+    yield b
+    b.stop()
+
+
+def _page(browser, box):
     context = browser.new_context(viewport={"width": 1000, "height": 900})
     pg = context.new_page()
     pg.box = box
     pg.set_default_timeout(5000)
+    return context, pg
+
+
+@pytest.fixture
+def page(browser, box):
+    context, pg = _page(browser, box)
     yield pg
     context.close()
 
 
-def sign_in(page, token=TOKEN, name="ana"):
-    """Open the page and give it the token and a name."""
+@pytest.fixture
+def new_page(browser, new_box):
+    context, pg = _page(browser, new_box)
+    yield pg
+    context.close()
+
+
+def sign_in(page, user=USER, password=PASSWORD):
+    """Open the page and sign in with the box's account."""
     page.goto(page.box.url + "/")
-    page.fill("#token", token)
-    page.fill("#name", name)
-    page.click("#token-save")
+    page.fill("#user", user)
+    page.fill("#password", password)
+    page.click("#signin-save")

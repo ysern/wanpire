@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -20,13 +23,14 @@ from fastapi.testclient import TestClient  # noqa: E402
 from mcp import Client  # noqa: E402
 from mcp.client.stdio import StdioServerParameters  # noqa: E402
 
+from wanpire.account import Account  # noqa: E402
 from wanpire.adapters import Adapter  # noqa: E402
 from wanpire.api import create_app  # noqa: E402
 from wanpire.broker import Broker  # noqa: E402
 from wanpire.config import config_from_dict  # noqa: E402
 
-TOKEN = "t0ken"
-AUTH = {"Authorization": f"Bearer {TOKEN}"}
+USER, PASSWORD = "admin", "correct horse"
+AUTH = {"Authorization": "Basic " + base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()}
 TOOLS = {"wanpire_status", "wanpire_endpoints", "wanpire_lease", "wanpire_poll",
          "wanpire_describe", "wanpire_apply", "wanpire_clear", "wanpire_counters",
          "wanpire_release"}
@@ -68,8 +72,11 @@ class Box:
     def __init__(self):
         self.engine = RecordingEngine()
         self.broker = Broker(on_clear=lambda: self.engine.clear("eth1"))
+        self.account = Account(Path(tempfile.mkdtemp()) / "account")
+        self.account.set(USER, PASSWORD)
         self.app = create_app(engine=self.engine, broker=self.broker, config=CONFIG,
-                              token=TOKEN, list_adapters=lambda: ADAPTERS, tick_s=None)
+                              account=self.account, list_adapters=lambda: ADAPTERS,
+                              tick_s=None, fail_delay_s=0)
         self.mcp = self.app.state.mcp
 
     def rest_ask(self, who="person", purpose="web page"):
@@ -223,10 +230,35 @@ def test_an_invalid_link(box):
 
 # -- /mcp over real HTTP --------------------------------------------------------------------
 
-def test_mcp_route_needs_the_token(box):
+def test_mcp_route_needs_the_account(box):
     with TestClient(box.app) as c:
         r = c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     assert r.status_code == 401
+
+
+def test_mcp_route_refuses_a_wrong_password(box):
+    wrong = {"Authorization": "Basic " + base64.b64encode(f"{USER}:nope".encode()).decode()}
+    with TestClient(box.app) as c:
+        r = c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                   headers=wrong)
+    assert r.status_code == 401
+
+
+def test_mcp_route_does_not_take_the_web_pages_cookie(box):
+    # another site's page could make a signed-in browser post here; it would carry the cookie
+    with TestClient(box.app) as c:
+        assert c.post("/api/v1/session", json={"user": USER, "password": PASSWORD}).is_success
+        assert c.get("/api/v1/status").status_code == 200
+        r = c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    assert r.status_code == 401
+
+
+def test_mcp_route_on_a_box_without_an_account(box):
+    box.account.reset()
+    with TestClient(box.app) as c:
+        r = c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                   headers=AUTH)
+    assert r.status_code == 403
 
 
 class Served:
@@ -254,7 +286,7 @@ class Served:
         self.thread.join(5)
 
 
-def test_an_mcp_client_over_http_with_the_token(box):
+def test_an_mcp_client_over_http_with_the_account(box):
     import httpx2
     from mcp.client.streamable_http import streamable_http_client
 
@@ -272,20 +304,34 @@ def test_an_mcp_client_over_http_with_the_token(box):
 
 # -- over stdio on a host -------------------------------------------------------------------
 
-def test_stdio_without_a_token_refuses(tmp_path):
-    env = {k: v for k, v in os.environ.items() if k != "WANPIRE_TOKEN"}
+def test_stdio_without_a_password_refuses(tmp_path):
+    env = {k: v for k, v in os.environ.items() if k not in ("WANPIRE_PASSWORD",)}
+    env["WANPIRE_USER"] = USER
     r = subprocess.run([sys.executable, "-m", "wanpire.cli", "mcp", "--url",
-                        "http://127.0.0.1:9", "--token-file", str(tmp_path / "none")],
+                        "http://127.0.0.1:9", "--password-file", str(tmp_path / "none")],
                        capture_output=True, text=True, env=env, timeout=60)
     assert r.returncode != 0
-    assert "WANPIRE_TOKEN" in r.stderr
+    assert "WANPIRE_USER" in r.stderr and "WANPIRE_PASSWORD" in r.stderr
+
+
+def test_stdio_reads_the_password_from_a_file(box, tmp_path):
+    f = tmp_path / "password"
+    f.write_text(PASSWORD + "\n", encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k != "WANPIRE_PASSWORD"}
+    with Served(box.app) as s:
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "wanpire.cli", "mcp", "--url", s.url, "--password-file", str(f)],
+            env={**env, "WANPIRE_USER": USER})
+        st = tool(params, "wanpire_status")
+    assert st["mode"] == "bridge"
 
 
 def test_stdio_calls_the_box(box):
     with Served(box.app) as s:
         params = StdioServerParameters(
             command=sys.executable, args=["-m", "wanpire.cli", "mcp", "--url", s.url],
-            env={**os.environ, "WANPIRE_TOKEN": TOKEN})
+            env={**os.environ, "WANPIRE_USER": USER, "WANPIRE_PASSWORD": PASSWORD})
         st = tool(params, "wanpire_status")
         a = tool(params, "wanpire_lease", {"who": "agent-2", "purpose": "stdio"})
     assert st["mode"] == "bridge"
@@ -296,4 +342,11 @@ def test_stdio_calls_the_box(box):
 def test_rest_client_is_httpx():
     # the tools speak plain HTTP to the REST API, in process or across the network
     from wanpire import mcp_server
-    assert isinstance(mcp_server.rest_client("http://box:8080", TOKEN), httpx.AsyncClient)
+    assert isinstance(mcp_server.rest_client("http://box:8080", USER, PASSWORD),
+                      httpx.AsyncClient)
+
+
+def test_rest_client_needs_credentials():
+    from wanpire import mcp_server
+    with pytest.raises(ValueError, match="user name and password"):
+        mcp_server.rest_client("http://box:8080")

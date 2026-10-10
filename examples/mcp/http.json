@@ -4,7 +4,7 @@
       "type": "http",
       "url": "http://<pi-address>:8080/mcp",
       "headers": {
-        "Authorization": "Bearer ${WANPIRE_TOKEN}"
+        "Authorization": "Basic ${WANPIRE_BASIC}"
       }
     }
   }

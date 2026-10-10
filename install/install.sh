@@ -2,8 +2,12 @@
 # wanpire's install, for Ubuntu Server and other Debian-like Linux with two Ethernet ports.
 #
 #   sudo install/install.sh [install] [--control IF] [--inbound IF] [--outbound IF]
-#                           [--mode bridge|router] [--apply-netplan] [--no-start]
+#                           [--mode bridge|router] [--apply-netplan] [--no-start] [--user NAME]
 #   sudo install/install.sh uninstall [--purge]
+#
+# No credential is written: the first visit to the box's web page makes its account, a user
+# name and a password. --user NAME sets it here instead, the password read from standard input.
+# A forgotten password: `sudo wanpire account set <user>` on the box, over SSH.
 #
 # Idempotent: run it again and it changes only what differs. Without roles it proposes the
 # Wi-Fi adapter as control, the on-board Ethernet port as inbound and a USB Ethernet port as
@@ -34,6 +38,7 @@ INBOUND=""
 OUTBOUND=""
 MODE=""
 GIVEN=0
+ACCOUNT_USER=""
 HERE=$(cd "$(dirname "$0")" && pwd)
 SOURCE=$(dirname "$HERE")
 
@@ -50,6 +55,7 @@ while [ $# -gt 0 ]; do
         --inbound) need "$@"; INBOUND=$2; GIVEN=1; shift ;;
         --outbound) need "$@"; OUTBOUND=$2; GIVEN=1; shift ;;
         --mode) need "$@"; MODE=$2; GIVEN=1; shift ;;
+        --user) need "$@"; ACCOUNT_USER=$2; shift ;;
         --dry-run) DRY=1 ;;
         --no-apt) APT=0 ;;
         --no-venv) VENV=0 ;;
@@ -57,7 +63,7 @@ while [ $# -gt 0 ]; do
         --no-check) CHECK=0 ;;
         --apply-netplan) APPLY_NETPLAN=1 ;;
         --purge) PURGE=1 ;;
-        -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
         *) die "unknown argument: $1 (see --help)" ;;
     esac
     shift
@@ -77,7 +83,8 @@ P() { printf '%s%s' "$ROOT" "$1"; }  # a path on the box, under the staging root
 VENV_DIR=/opt/wanpire/venv
 WANPIRE=$VENV_DIR/bin/wanpire
 CONFIG=/etc/wanpire/wanpire.json
-TOKEN=/etc/wanpire/token
+ACCOUNT=/etc/wanpire/account
+OLD_TOKEN=/etc/wanpire/token  # the first version's; nothing reads it any more
 NETPLAN=/etc/netplan/60-wanpire.yaml
 UNIT=/etc/systemd/system/wanpire.service
 WANTS=/etc/systemd/system/multi-user.target.wants/wanpire.service
@@ -214,7 +221,7 @@ if [ "$ACTION" = uninstall ]; then
     if [ "$PURGE" = 1 ]; then
         remove /etc/wanpire
     else
-        step keep "kept /etc/wanpire (the configuration and the token); --purge removes it"
+        step keep "kept /etc/wanpire (the configuration and the account); --purge removes it"
     fi
     exit 0
 fi
@@ -288,15 +295,32 @@ if [ "$VENV" = 1 ] && [ "$STAGING" = 0 ] && [ "$DRY" = 0 ] && [ "$CHECK" = 1 ]; 
         die "wanpire refused $CONFIG (above); fix it and run this again"
 fi
 
-if [ -s "$(P "$TOKEN")" ]; then
-    step token "unchanged: $TOKEN"
-elif [ "$DRY" = 1 ]; then
-    step token "would generate $TOKEN (mode 0600)"
-else
-    mkdir -p "$(dirname "$(P "$TOKEN")")"
-    (umask 077 && od -An -tx1 -N32 /dev/urandom | tr -d ' \n' > "$(P "$TOKEN")" && echo >> "$(P "$TOKEN")")
-    chmod 600 "$(P "$TOKEN")"
-    step token "generated $TOKEN (mode 0600): give it to the web page and your MCP host"
+remove "$OLD_TOKEN"
+
+# wanpire's own command sets the account: the venv's, or (--no-venv) the checkout's
+account_tool() {
+    if [ "$VENV" = 1 ]; then
+        "$(P $VENV_DIR)/bin/wanpire" account "$@"
+    else
+        PYTHONPATH="$SOURCE/src" "${PYTHON:-python3}" -m wanpire.cli account "$@"
+    fi
+}
+
+HAS_ACCOUNT=0
+if [ -s "$(P "$ACCOUNT")" ]; then
+    HAS_ACCOUNT=1
+    step account "unchanged: $ACCOUNT"
+    [ -z "$ACCOUNT_USER" ] || \
+        step account "--user ignored: the box has an account; to change it: sudo wanpire account set <user>"
+elif [ -n "$ACCOUNT_USER" ]; then
+    if [ "$DRY" = 1 ]; then
+        step account "would set the account $ACCOUNT_USER, the password from standard input"
+    else
+        account_tool set "$ACCOUNT_USER" --file "$(P "$ACCOUNT")" >/dev/null || \
+            die "the account was not set (above); run this again, or make it on the first visit"
+        HAS_ACCOUNT=1
+        step account "set: $ACCOUNT_USER, in $ACCOUNT (mode 0600, the password hashed)"
+    fi
 fi
 
 if [ "$STAGING" = 1 ] || [ -d /etc/netplan ]; then
@@ -339,4 +363,8 @@ else
     else
         step service "enabled, not started (--no-start)"
     fi
+fi
+
+if [ "$HAS_ACCOUNT" = 0 ]; then
+    step account "none yet: open http://<control address>:8080/ now to make it (until then, anyone on the control network can), or: sudo wanpire account set <user>"
 fi

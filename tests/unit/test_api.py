@@ -1,19 +1,28 @@
 """The REST API, against a recording engine and a broker on a fake clock. No root."""
 
+import base64
+
 import pytest
 
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from wanpire import catalogue  # noqa: E402
+from wanpire.account import Account  # noqa: E402
 from wanpire.adapters import Adapter  # noqa: E402
 from wanpire.api import create_app  # noqa: E402
 from wanpire.broker import Broker  # noqa: E402
 from wanpire.config import config_from_dict  # noqa: E402
 from wanpire.model import Direction, InvalidLink, Link  # noqa: E402
 
-TOKEN = "t0ken"
-AUTH = {"Authorization": f"Bearer {TOKEN}"}
+USER, PASSWORD = "admin", "correct horse"
+
+
+def basic(user, password):
+    return {"Authorization": "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()}
+
+
+AUTH = basic(USER, PASSWORD)
 
 
 class Clock:
@@ -51,15 +60,28 @@ CONFIG = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
                                         "outbound": ["eth1"]}})
 
 
-@pytest.fixture
-def box():
+def make_box(path, with_account=True):
     engine, clock = RecordingEngine(), Clock()
     broker = Broker(clock=clock, on_clear=lambda: engine.clear("eth1"))
-    app = create_app(engine=engine, broker=broker, config=CONFIG, token=TOKEN,
-                     list_adapters=lambda: ADAPTERS, tick_s=None)
+    account = Account(path)
+    if with_account:
+        account.set(USER, PASSWORD)
+    app = create_app(engine=engine, broker=broker, config=CONFIG, account=account,
+                     list_adapters=lambda: ADAPTERS, tick_s=None, fail_delay_s=0)
     client = TestClient(app)
-    client.engine, client.clock, client.broker = engine, clock, broker
+    client.engine, client.clock, client.broker, client.account = engine, clock, broker, account
     return client
+
+
+@pytest.fixture
+def box(tmp_path):
+    return make_box(tmp_path / "account")
+
+
+@pytest.fixture
+def new_box(tmp_path):
+    """A box as installed: no account yet."""
+    return make_box(tmp_path / "account", with_account=False)
 
 
 def ask(c, who="A", purpose="soak"):
@@ -72,23 +94,148 @@ def t(ticket):
     return {**AUTH, "X-Wanpire-Ticket": ticket}
 
 
-# -- the token ----------------------------------------------------------------------------
+# -- the account: the first visit ------------------------------------------------------
 
-def test_no_token(box):
+def test_a_new_box_says_it_needs_an_account(new_box):
+    r = new_box.get("/api/v1/setup")
+    assert r.status_code == 200 and r.json() == {"needed": True}
+
+
+def test_a_new_box_refuses_everything_else(new_box):
+    r = new_box.get("/api/v1/status")
+    assert r.status_code == 403
+    assert "account" in r.json()["error"] and "web page" in r.json()["error"]
+
+
+def test_the_first_visit_makes_the_account_and_signs_in(new_box):
+    r = new_box.post("/api/v1/setup", json={"user": "admin", "password": "twelve chars"})
+    assert r.status_code == 201 and r.json() == {"user": "admin"}
+    assert new_box.get("/api/v1/status").status_code == 200  # the cookie alone
+    assert new_box.account.verify("admin", "twelve chars")
+    assert new_box.get("/api/v1/setup").json() == {"needed": False}
+
+
+def test_the_account_is_made_once(new_box):
+    new_box.post("/api/v1/setup", json={"user": "admin", "password": "twelve chars"})
+    r = new_box.post("/api/v1/setup", json={"user": "eve", "password": "twelve chars"})
+    assert r.status_code == 409
+    assert new_box.account.user == "admin"
+
+
+@pytest.mark.parametrize("body, says", [
+    ({"user": "admin", "password": "short"}, "8 characters"),
+    ({"user": "two words", "password": "twelve chars"}, "user name"),
+    ({"password": "twelve chars"}, "user name"),
+])
+def test_an_invalid_account_is_refused(new_box, body, says):
+    r = new_box.post("/api/v1/setup", json=body)
+    assert r.status_code == 422 and says in r.json()["error"]
+    assert not new_box.account.exists()
+
+
+# -- the account: credentials -------------------------------------------------------------
+
+def test_no_credentials(box):
     r = box.get("/api/v1/status")
     assert r.status_code == 401
 
 
-def test_a_wrong_token(box):
-    assert box.get("/api/v1/status", headers={"Authorization": "Bearer nope"}).status_code == 401
+def test_a_wrong_password(box):
+    assert box.get("/api/v1/status", headers=basic(USER, "wrong horse")).status_code == 401
+    assert box.get("/api/v1/status", headers=basic("root", PASSWORD)).status_code == 401
 
 
-def test_status_with_the_token(box):
+def test_a_bearer_token_is_no_longer_taken(box):
+    assert box.get("/api/v1/status", headers={"Authorization": "Bearer x"}).status_code == 401
+
+
+def test_status_with_basic(box):
     ask(box)
     s = box.get("/api/v1/status", headers=AUTH).json()
     assert s["mode"] == "bridge" and s["outbound"] == "eth1"
     assert s["link"]["down"]["applied"] is False
     assert s["broker"]["holder"]["who"] == "A"
+
+
+def test_setup_on_a_box_with_an_account_needs_nothing(box):
+    assert box.get("/api/v1/setup").json() == {"needed": False}
+
+
+# -- the account: a browser's session -----------------------------------------------------
+
+def test_signing_in_sets_a_private_cookie(box):
+    r = box.post("/api/v1/session", json={"user": USER, "password": PASSWORD})
+    assert r.status_code == 200 and r.json() == {"user": USER}
+    cookie = r.headers["set-cookie"].lower()
+    assert "httponly" in cookie and "samesite=strict" in cookie
+    assert box.get("/api/v1/status").status_code == 200
+    assert box.get("/api/v1/session").json() == {"user": USER}
+
+
+def test_signing_in_with_a_wrong_password(box):
+    r = box.post("/api/v1/session", json={"user": USER, "password": "wrong horse"})
+    assert r.status_code == 401
+    assert box.get("/api/v1/status").status_code == 401
+
+
+def test_no_session(box):
+    assert box.get("/api/v1/session").status_code == 401
+
+
+def test_signing_out(box):
+    box.post("/api/v1/session", json={"user": USER, "password": PASSWORD})
+    assert box.delete("/api/v1/session").status_code == 204
+    assert box.get("/api/v1/status").status_code == 401
+
+
+def test_a_forged_cookie_is_refused(box):
+    box.cookies.set("wanpire_session", "made-up")
+    assert box.get("/api/v1/status").status_code == 401
+
+
+def test_changing_the_password(box):
+    box.post("/api/v1/session", json={"user": USER, "password": PASSWORD})
+    second = TestClient(box.app)
+    second.post("/api/v1/session", json={"user": USER, "password": PASSWORD})
+    r = box.put("/api/v1/account/password", json={"current": PASSWORD, "new": "battery staple"})
+    assert r.status_code == 204
+    assert box.get("/api/v1/status").status_code == 200  # this session kept
+    assert second.get("/api/v1/status").status_code == 401  # every other one ended
+    assert box.get("/api/v1/status", headers=AUTH).status_code == 401
+    assert box.get("/api/v1/status", headers=basic(USER, "battery staple")).status_code == 200
+
+
+def test_changing_the_password_needs_the_current_one(box):
+    box.post("/api/v1/session", json={"user": USER, "password": PASSWORD})
+    r = box.put("/api/v1/account/password",
+                json={"current": "wrong horse", "new": "battery staple"})
+    assert r.status_code == 401
+    assert box.account.verify(USER, PASSWORD)
+
+
+def test_a_new_password_too_short(box):
+    r = box.put("/api/v1/account/password", json={"current": PASSWORD, "new": "short"},
+                headers=AUTH)
+    assert r.status_code == 422
+
+
+def _touch(path):
+    import os
+    st = os.stat(path)
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+
+
+def test_a_password_set_over_ssh_is_seen_at_once(box):
+    Account(box.account.path).set(USER, "battery staple")  # `sudo wanpire account set admin`
+    _touch(box.account.path)
+    assert box.get("/api/v1/status", headers=AUTH).status_code == 401
+    assert box.get("/api/v1/status", headers=basic(USER, "battery staple")).status_code == 200
+
+
+def test_a_reset_over_ssh_makes_the_box_new_again(box):
+    Account(box.account.path).reset()  # `sudo wanpire account reset`
+    assert box.get("/api/v1/status", headers=AUTH).status_code == 403
+    assert box.get("/api/v1/setup").json() == {"needed": True}
 
 
 # -- the lease ----------------------------------------------------------------------------

@@ -1,8 +1,9 @@
 """wanpire's MCP server: a thin layer of tools over the REST API.
 
-Every tool calls ``/api/v1`` over HTTP with the box's token, so the token check and the broker
-are the REST API's. On the box the HTTP client's transport is the app itself (no socket); on a
-host (``wanpire mcp --url ...``) it is the network.
+Every tool calls ``/api/v1`` over HTTP with the box's account, so the account check and the
+broker are the REST API's. On the box the HTTP client's transport is the app itself (no socket)
+and it carries a credential the app made at start; on a host (``wanpire mcp --url ...``) it is
+the network, and it carries the user name and the password in Basic.
 
 The agent carries its lease's ticket: ``wanpire_lease`` returns it and every change takes it.
 """
@@ -32,7 +33,8 @@ logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per call is noi
 
 _MEANING = {
     400: "Not understood",
-    401: "The box refused the token",
+    401: "The box refused the user name or the password",
+    403: "The box has no account yet; ask your user to open its web page and make one",
     404: "Unknown ticket (it expired from the queue, or was never issued); ask again with "
          "wanpire_lease",
     409: "You do not hold the link; wait for it with wanpire_poll",
@@ -42,11 +44,19 @@ _MEANING = {
 }
 
 
-def rest_client(url: str, token: str, transport: httpx.AsyncBaseTransport | None = None,
+def rest_client(url: str, user: str | None = None, password: str | None = None, *,
+                bearer: str | None = None, transport: httpx.AsyncBaseTransport | None = None,
                 timeout_s: float = 30.0) -> httpx.AsyncClient:
-    """An HTTP client for the box's REST API at ``url``, carrying the token."""
+    """An HTTP client for the box's REST API at ``url``: the account in Basic, or (in process
+    on the box) the app's own credential."""
+    if bearer:
+        auth, headers = None, {"Authorization": f"Bearer {bearer}"}
+    elif user and password:
+        auth, headers = httpx.BasicAuth(user, password), {}
+    else:
+        raise ValueError("the REST client needs the box's user name and password")
     return httpx.AsyncClient(base_url=url.rstrip("/") + "/api/v1", transport=transport,
-                             headers={"Authorization": f"Bearer {token}"}, timeout=timeout_s)
+                             auth=auth, headers=headers, timeout=timeout_s)
 
 
 def _ticket(ticket: str) -> dict[str, Any]:

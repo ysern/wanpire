@@ -191,11 +191,62 @@ def test_up_refuses_an_invalid_mapping(box, capsys, tmp_path):
 
 # -- serve --------------------------------------------------------------------------------
 
-def test_serve_refuses_without_a_token(tmp_path, capsys):
-    assert cli.main(["serve", "--token-file", str(tmp_path / "none"),
-                     "--config", str(tmp_path / "none.json")]) == 2
+def test_serve_starts_without_an_account(tmp_path, monkeypatch, capsys):
+    pytest.importorskip("fastapi")
+    import uvicorn
+
+    from wanpire.config import config_from_dict
+    cfg = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
+                            "adapters": {"control": "wlan0", "inbound": "eth0",
+                                         "outbound": ["eth1"]}})
+    monkeypatch.setattr(cli, "load_config", lambda *_: cfg)
+    monkeypatch.setattr(cli, "make_engine", lambda **_: FakeEngine())
+    served = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: served.append((app, kw)))
+    assert cli.main(["serve", "--account-file", str(tmp_path / "account"), "--netns", "bed",
+                     "--host", "127.0.0.1"]) == 0
+    assert served and served[0][1]["host"] == "127.0.0.1"
     err = capsys.readouterr().err
-    assert "token" in err and "openssl rand -hex 32" in err
+    assert "no account yet" in err and "web page" in err
+
+
+def test_account_set_reads_the_password_from_stdin(tmp_path, monkeypatch, capsys):
+    import io
+
+    from wanpire.account import Account
+    p = tmp_path / "account"
+    monkeypatch.setattr("sys.stdin", io.StringIO("correct horse\n"))
+    assert cli.main(["account", "set", "admin", "--file", str(p)]) == 0
+    assert Account(p).verify("admin", "correct horse")
+    assert "correct horse" not in capsys.readouterr().out
+
+
+def test_account_set_refuses_a_short_password(tmp_path, monkeypatch, capsys):
+    import io
+    p = tmp_path / "account"
+    monkeypatch.setattr("sys.stdin", io.StringIO("short\n"))
+    assert cli.main(["account", "set", "admin", "--file", str(p)]) == 2
+    assert "8 characters" in capsys.readouterr().err
+    assert not p.exists()
+
+
+def test_account_reset_removes_it(tmp_path, capsys):
+    from wanpire.account import Account
+    p = tmp_path / "account"
+    Account(p).set("admin", "correct horse")
+    assert cli.main(["account", "reset", "--file", str(p)]) == 0
+    assert not p.exists()
+    assert "web page" in capsys.readouterr().out
+
+
+def test_account_show(tmp_path, capsys):
+    from wanpire.account import Account
+    p = tmp_path / "account"
+    assert cli.main(["account", "show", "--file", str(p)]) == 0
+    assert "no account" in capsys.readouterr().out
+    Account(p).set("admin", "correct horse")
+    assert cli.main(["account", "show", "--file", str(p)]) == 0
+    assert capsys.readouterr().out.strip() == "admin"
 
 
 def test_the_control_address_is_read_from_ip(monkeypatch):

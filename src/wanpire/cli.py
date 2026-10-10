@@ -4,7 +4,11 @@
     wanpire up                       (the mode in /etc/wanpire/wanpire.json)
     wanpire down
     wanpire serve                    (the REST API, the web page and the MCP, on the control address)
-    wanpire mcp --url http://<pi-address>:8080   (the MCP over stdio on a host; WANPIRE_TOKEN)
+    wanpire account set admin        (the box's account; the password on stdin; over SSH on the box)
+    wanpire account reset            (remove it: the next visit to the web page makes it again)
+    wanpire account show
+    wanpire mcp --url http://<pi-address>:8080   (the MCP over stdio on a host;
+                                                  WANPIRE_USER, WANPIRE_PASSWORD)
     wanpire reset                    (clear every configured outbound adapter; the service's start)
     wanpire endpoints
     wanpire preview london:consumer-fibre los-angeles:mobile-4g
@@ -24,6 +28,8 @@ import sys
 from dataclasses import fields
 
 from . import catalogue
+from .account import DEFAULT_PATH as ACCOUNT_PATH
+from .account import Account, InvalidAccount
 from .adapters import list_adapters
 from .config import DEFAULT_PATH, InvalidConfig, load_config
 from .engine import DEFAULT_LIFETIME_S, CommandFailed, Engine, RefusedAdapter, run
@@ -37,9 +43,6 @@ def make_engine(netns: str | None = None, control=()) -> Engine:
     return Engine(netns=netns, control_adapters=control)
 
 
-TOKEN_PATH = "/etc/wanpire/token"
-
-
 def control_address(adapter: str) -> str:
     """The control adapter's first IPv4 address."""
     for link in json.loads(run(["ip", "-j", "-4", "addr", "show", "dev", adapter]) or "[]"):
@@ -50,15 +53,6 @@ def control_address(adapter: str) -> str:
 
 
 def _serve(a) -> int:
-    try:
-        with open(a.token_file, encoding="utf-8") as f:
-            token = f.read().strip()
-    except OSError:
-        token = ""
-    if not token:
-        raise ValueError(f"no token in {a.token_file}; make one: "
-                         f"openssl rand -hex 32 | sudo tee {a.token_file} && "
-                         f"sudo chmod 600 {a.token_file}")
     import uvicorn
 
     from .api import create_app
@@ -68,10 +62,38 @@ def _serve(a) -> int:
     outbound = cfg.outbound[0]
     engine = make_engine(netns=a.netns, control=[cfg.control])
     broker = Broker(on_clear=lambda: engine.clear(outbound))
-    app = create_app(engine=engine, broker=broker, config=cfg, token=token,
+    account = Account(a.account_file)
+    app = create_app(engine=engine, broker=broker, config=cfg, account=account,
                      list_adapters=list_adapters)
     host = a.host or control_address(cfg.control)
+    if not account.exists():
+        print(f"wanpire: no account yet: open the web page, http://{host}:{a.port}/, to make "
+              f"one, or run `sudo wanpire account set <user>` on the box", file=sys.stderr)
     uvicorn.run(app, host=host, port=a.port, workers=1)
+    return 0
+
+
+def _read_password(confirm: bool) -> str:
+    """The password from standard input: asked twice at a terminal, else its first line."""
+    if sys.stdin.isatty():
+        import getpass
+        first = getpass.getpass("Password: ")
+        if confirm and getpass.getpass("Again: ") != first:
+            raise InvalidAccount("the two passwords differ")
+        return first
+    return sys.stdin.readline().rstrip("\r\n")
+
+
+def _account(a) -> int:
+    account = Account(a.file)
+    if a.action == "set":
+        account.set(a.user, _read_password(confirm=True))
+        print(f"the account is {a.user}; a running server takes it at its next call")
+    elif a.action == "reset":
+        account.reset()
+        print("no account: the next visit to the box's web page makes one")
+    else:
+        print(account.user or "no account: the next visit to the box's web page makes one")
     return 0
 
 
@@ -87,19 +109,20 @@ def _reset(a) -> int:
 def _mcp(a) -> int:
     """The MCP over stdio on a host, calling the box's REST API at ``--url``."""
     import os
-    token = ""
-    if a.token_file:
+    password = ""
+    if a.password_file:
         try:
-            with open(os.path.expanduser(a.token_file), encoding="utf-8") as f:
-                token = f.read().strip()
+            with open(os.path.expanduser(a.password_file), encoding="utf-8") as f:
+                password = f.readline().rstrip("\r\n")
         except OSError:
-            token = ""
-    token = token or os.environ.get("WANPIRE_TOKEN", "").strip()
-    if not token:
-        raise ValueError("no token: put the box's token (/etc/wanpire/token on the box) in "
-                         "WANPIRE_TOKEN, or in a file named by --token-file")
+            password = ""
+    password = password or os.environ.get("WANPIRE_PASSWORD", "")
+    user = os.environ.get("WANPIRE_USER", "").strip()
+    if not user or not password:
+        raise ValueError("the box's account is needed: its user name in WANPIRE_USER and its "
+                         "password in WANPIRE_PASSWORD, or in a file named by --password-file")
     from .mcp_server import make_mcp, rest_client
-    make_mcp(rest_client(a.url, token)).run("stdio")
+    make_mcp(rest_client(a.url, user, password)).run("stdio")
     return 0
 
 
@@ -129,7 +152,11 @@ def _parser() -> argparse.ArgumentParser:
     ad.add_argument("--json", action="store_true", help="print JSON")
     sv = sub.add_parser("serve", help="serve the REST API on the control adapter's address")
     sv.add_argument("--config", default=DEFAULT_PATH)
-    sv.add_argument("--token-file", default=TOKEN_PATH)
+    sv.add_argument("--account-file", default=ACCOUNT_PATH)
+    ac = sub.add_parser("account", help="the box's account: set it, reset it, or show its user")
+    ac.add_argument("action", choices=("set", "reset", "show"))
+    ac.add_argument("user", nargs="?", help="for set: the user name")
+    ac.add_argument("--file", default=ACCOUNT_PATH)
     sv.add_argument("--host", help="listen here instead of the control adapter's address")
     sv.add_argument("--port", type=int, default=8080)
     sv.add_argument("--netns", help="the namespace the outbound adapter lives in (test beds)")
@@ -138,7 +165,9 @@ def _parser() -> argparse.ArgumentParser:
     rs.add_argument("--netns", help="the namespace the outbound adapter lives in (test beds)")
     mc = sub.add_parser("mcp", help="run the MCP over stdio here, calling the box's REST API")
     mc.add_argument("--url", required=True, help="the box, e.g. http://<pi-address>:8080")
-    mc.add_argument("--token-file", help="a file holding the box's token (else WANPIRE_TOKEN)")
+    mc.add_argument("--password-file",
+                    help="a file holding the account's password (else WANPIRE_PASSWORD); "
+                         "the user name is in WANPIRE_USER")
     for name, text in (("up", "set up the configured mode (bridge or router)"),
                        ("down", "tear down whatever either mode set up")):
         m = sub.add_parser(name, help=text)
@@ -176,6 +205,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if a.command == "serve":
             return _serve(a)
+        if a.command == "account":
+            if a.action == "set" and not a.user:
+                raise ValueError("`wanpire account set` needs the user name")
+            return _account(a)
         if a.command == "mcp":
             return _mcp(a)
         if a.command == "reset":

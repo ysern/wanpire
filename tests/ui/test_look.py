@@ -4,7 +4,7 @@ at 720 and 1,280 px in both themes (spec: web-ui, the look's requirements)."""
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import TOKEN, sign_in
+from .conftest import sign_in
 
 SECTIONS = ["link", "endpoints", "broker", "adapters", "settings"]
 PAGES = [("link", "link-set"), ("link", "link-counters"), ("endpoints", "endpoints-places"),
@@ -126,10 +126,10 @@ def test_no_sideways_scroll_and_aa_contrast(browser, box, width, scheme):
         box.engine.applied = True
         box.engine.packets = 1000
         page.goto(box.url + "/")
-        expect(page.locator("#token")).to_be_visible()
+        expect(page.locator("#password")).to_be_visible()
         result = page.evaluate(CONTRAST_JS)
         assert result["failures"] == [], f"sign-in: {result['failures']}"
-        sign_in(page, token=TOKEN)
+        sign_in(page)
         page.select_option("#far-channel", "mobile-4g")
         expect(page.locator("#down-delay_ms")).not_to_have_text("-")
         page.fill("#purpose", "contrast check")
@@ -141,6 +141,27 @@ def test_no_sideways_scroll_and_aa_contrast(browser, box, width, scheme):
             result = page.evaluate(CONTRAST_JS)
             assert result["checked"] > 5, sub
             assert result["failures"] == [], f"{sub}: {result['failures']}"
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width", [360, 1280])
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_the_setup_card_is_readable(browser, new_box, width, scheme):
+    context = browser.new_context(viewport={"width": width, "height": 900}, color_scheme=scheme)
+    page = context.new_page()
+    page.set_default_timeout(5000)
+    try:
+        page.goto(new_box.url + "/")
+        expect(page.locator("#setup")).to_be_visible()
+        page.fill("#setup-password", "short")
+        page.fill("#setup-again", "short")
+        page.click("#setup-save")
+        expect(page.locator("#setup-error")).to_contain_text("8 characters")
+        assert page.evaluate("document.documentElement.scrollWidth") <= width
+        result = page.evaluate(CONTRAST_JS)
+        assert result["checked"] > 5
+        assert result["failures"] == [], f"setup: {result['failures']}"
     finally:
         context.close()
 

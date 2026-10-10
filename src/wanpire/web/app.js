@@ -1,6 +1,7 @@
 // wanpire's web page: a client of the REST API under /api/v1, and nothing more.
-// The token is kept in localStorage (asked once), the lease's ticket in sessionStorage
-// (one tab, one client). Plain JS, no build step.
+// The first visit makes the box's account; afterwards the page signs in with it and holds a
+// session cookie it cannot read, so the browser's storage keeps no credential. The lease's
+// ticket is in sessionStorage (one tab, one client). Plain JS, no build step.
 "use strict";
 
 const API = "api/v1";
@@ -16,8 +17,7 @@ const store = {
   },
 };
 
-let token = store.get("localStorage", "wanpire.token");
-let name = store.get("localStorage", "wanpire.name") || "";
+let user = null; // the account signed in, from the box
 let ticket = store.get("sessionStorage", "wanpire.ticket");
 let holds = false;
 let leaseTtl = 120;
@@ -31,19 +31,25 @@ let lastHolder = null;
 
 class Refused extends Error {}
 
-async function call(method, path, body, withTicket) {
-  const headers = { Authorization: `Bearer ${token}` };
+async function send(method, path, body, withTicket) {
+  const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (withTicket && ticket) headers["X-Wanpire-Ticket"] = ticket;
   const r = await fetch(`${API}/${path}`, {
-    method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+    method, headers, credentials: "same-origin",
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (r.status === 401) {
-    signOut("The token was refused. Give it again.");
-    throw new Refused();
-  }
   const data = r.status === 204 ? null : await r.json().catch(() => null);
   return { status: r.status, ok: r.ok, data };
+}
+
+// A call made while signed in: a refusal means the session has gone (signed out elsewhere,
+// the password changed, the server restarted, or the account reset on the box).
+async function call(method, path, body, withTicket) {
+  const res = await send(method, path, body, withTicket);
+  if (res.status === 401) { showSignIn("Your session ended. Sign in again."); throw new Refused(); }
+  if (res.status === 403) { showSetup(); throw new Refused(); }
+  return res;
 }
 
 function errorOf(res) {
@@ -130,24 +136,91 @@ async function loadAdapters() {
     a.name, a.kind, a.role || "none", a.state || "-", a.speed_mbit ? `${a.speed_mbit} Mbit/s` : "-"]));
 }
 
-// -- signing in -----------------------------------------------------------------------------
+// -- the first visit, signing in and out ------------------------------------------------------
 
-function signOut(why) {
-  token = null;
-  store.set("localStorage", "wanpire.token", null);
+const MIN_PASSWORD = 8;
+
+function leave() {
+  user = null;
   clearInterval(statusTimer);
   statusTimer = null;
+  setTicket(null);
+  holds = false;
   $("app").hidden = true;
   $("signin-wrap").hidden = false;
-  $("name").value = name;
-  $("token").value = "";
-  $("token-error").textContent = why || "";
 }
 
-async function signIn() {
+function showSetup() {
+  leave();
+  $("signin").hidden = true;
+  $("setup").hidden = false;
+  $("setup-password").value = "";
+  $("setup-again").value = "";
+  $("setup-error").textContent = "";
+}
+
+function showSignIn(why) {
+  leave();
+  $("setup").hidden = true;
+  $("signin").hidden = false;
+  $("password").value = "";
+  $("signin-error").textContent = why || "";
+}
+
+function passwordProblem(password, again) {
+  if (password.length < MIN_PASSWORD) return `A password has at least ${MIN_PASSWORD} characters.`;
+  if (password !== again) return "The two passwords differ.";
+  return "";
+}
+
+$("setup").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const u = $("setup-user").value.trim();
+  const problem = passwordProblem($("setup-password").value, $("setup-again").value);
+  if (!u) { $("setup-error").textContent = "Give a user name."; return; }
+  if (problem) { $("setup-error").textContent = problem; return; }
+  const res = await send("POST", "setup", { user: u, password: $("setup-password").value });
+  if (res.ok) { enter(res.data.user); return; }
+  if (res.status === 409) { showSignIn("The box has an account already. Sign in."); return; }
+  $("setup-error").textContent = errorOf(res);
+});
+
+$("signin").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const res = await send("POST", "session",
+    { user: $("user").value.trim(), password: $("password").value });
+  if (res.ok) { enter(res.data.user); return; }
+  if (res.status === 403) { showSetup(); return; }
+  $("password").value = "";
+  $("signin-error").textContent = res.status === 401
+    ? "The user name or the password was refused." : errorOf(res);
+});
+
+$("signout").addEventListener("click", async () => {
+  if (ticket) await send("DELETE", "lease", undefined, true).catch(() => {});
+  await send("DELETE", "session").catch(() => {});
+  showSignIn("");
+});
+
+$("pw-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const m = $("pw-message");
+  const problem = passwordProblem($("pw-new").value, $("pw-again").value);
+  if (problem) { m.textContent = problem; m.className = "help bad"; return; }
+  // sent without `call`: a refused current password is an answer here, not a lost session
+  const res = await send("PUT", "account/password",
+    { current: $("pw-current").value, new: $("pw-new").value });
+  for (const id of ["pw-current", "pw-new", "pw-again"]) $(id).value = "";
+  if (res.ok) { m.textContent = "The password was changed."; m.className = "help good"; return; }
+  m.textContent = res.status === 401 ? "The current password was refused." : errorOf(res);
+  m.className = "help bad";
+});
+
+async function enter(who) {
+  user = who;
   $("signin-wrap").hidden = true;
   $("app").hidden = false;
-  $("me").textContent = `web: ${name}`;
+  $("me").textContent = user;
   route();
   try {
     await refresh();
@@ -162,18 +235,6 @@ async function signIn() {
   if (ticket) await pollOnce();
   showLease();
 }
-
-$("signin").addEventListener("submit", (ev) => {
-  ev.preventDefault();
-  token = $("token").value.trim();
-  name = $("name").value.trim();
-  store.set("localStorage", "wanpire.token", token);
-  store.set("localStorage", "wanpire.name", name);
-  $("token-error").textContent = "";
-  signIn();
-});
-
-$("forget").addEventListener("click", () => signOut(""));
 
 // -- the status, the counters and who uses the box -------------------------------------------
 
@@ -336,7 +397,7 @@ async function pollOnce() {
 
 $("ask").addEventListener("click", async () => {
   const purpose = $("purpose").value.trim() || "testing from the web page";
-  const res = await call("POST", "lease", { who: `web: ${name}`, purpose });
+  const res = await call("POST", "lease", { who: `web: ${user}`, purpose });
   if (!res.ok) { say(errorOf(res), "bad"); return; }
   setTicket(res.data.ticket);
   answered(res.data);
@@ -367,11 +428,11 @@ $("release").addEventListener("click", async () => {
 });
 
 window.addEventListener("pagehide", () => {
-  if (!ticket || !token) return;
+  if (!ticket || !user) return;
   // a closed page gives the link back; a browser that dies is covered by the TTL
   fetch(`${API}/lease`, {
-    method: "DELETE", keepalive: true,
-    headers: { Authorization: `Bearer ${token}`, "X-Wanpire-Ticket": ticket },
+    method: "DELETE", keepalive: true, credentials: "same-origin",
+    headers: { "X-Wanpire-Ticket": ticket },
   });
   store.set("sessionStorage", "wanpire.ticket", null);
 });
@@ -393,4 +454,15 @@ $("end-lease").addEventListener("click", async () => {
 
 // -- start ----------------------------------------------------------------------------------
 
-if (token) signIn(); else signOut("");
+async function start() {
+  try {
+    const setup = await send("GET", "setup");
+    if (setup.ok && setup.data.needed) { showSetup(); return; }
+    const session = await send("GET", "session");
+    if (session.ok) enter(session.data.user); else showSignIn("");
+  } catch (e) {
+    showSignIn(`Cannot reach the box: ${e.message}`);
+  }
+}
+
+start();

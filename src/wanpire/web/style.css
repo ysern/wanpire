@@ -90,7 +90,8 @@ code { font-size: 13px; }
 .signin input { width: 100%; margin-top: 6px; }
 .signin .help { margin: 4px 0 6px; }
 .signin button.primary { margin-top: 18px; width: 100%; }
-#token-error { min-height: 1.4em; margin: 10px 0 0; text-align: center; }
+#setup-error, #signin-error { min-height: 1.4em; margin: 10px 0 0; text-align: center; }
+.signin code { overflow-wrap: anywhere; }
 
 /* -- the header band ---------------------------------------------------------------------- */
 

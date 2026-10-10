@@ -20,7 +20,21 @@ sudo install/install.sh uninstall       # and back out (--purge also removes /et
 ```
 
 It installs a service that clears every impairment at boot and serves the web page, the REST
-API and the MCP on the control address, port 8080. The token is in `/etc/wanpire/token`.
+API and the MCP on the control address, port 8080.
+
+**Then open `http://<pi-address>:8080/` at once,** as with a new home router: the first visit
+makes the box's one account, a user name and a password, which people and agents both sign in
+with. Until then anyone on the control network could make it; to set it during the install
+instead, add `--user admin` and give the password on standard input.
+
+A forgotten password is reset on the box itself, over SSH:
+
+```sh
+ssh <pi-address> sudo wanpire account set admin   # a new password, asked twice
+ssh <pi-address> sudo wanpire account reset       # or none: the next visit makes it again
+```
+
+The running server takes the change at once; no restart.
 
 The reference build is a Raspberry Pi 4 with Ubuntu Server 24.04 LTS, its on-board
 Ethernet port as the link in and a USB 3 gigabit Ethernet adapter as the link out,
@@ -77,19 +91,21 @@ sudo .venv/bin/wanpire up           # set up the configured mode
 sudo .venv/bin/wanpire down         # and take it off again
 ```
 
-The REST API (`wanpire serve`, on the control adapter's address, port 8080) needs the token in
-`/etc/wanpire/token` (`openssl rand -hex 32`, mode 0600). One client drives the link at a time:
+The REST API (`wanpire serve`, on the control adapter's address, port 8080) needs the box's
+account: HTTP Basic credentials on every call (`curl -u admin:<password> ...`), or a browser's
+session after it signs in. One client drives the link at a time:
 ask for a lease (`POST /api/v1/lease`), keep it by polling (`POST /api/v1/lease/poll`), change
 the link with its ticket (`PUT /api/v1/link`), release it (`DELETE /api/v1/lease`). The routes
 are listed in [`src/wanpire/api.py`](src/wanpire/api.py) and at `/docs` on the box.
 
-The same server serves a web page at `http://<pi-address>:8080/`: give it the token once, pick
+The same server serves a web page at `http://<pi-address>:8080/`: sign in, pick
 the two ends and a channel for each, see the link's figures, ask for the link, apply, clear,
 read the counters and see who else is using the box.
 
-AI agents use the MCP at `http://<pi-address>:8080/mcp` (streamable HTTP, the same token in an
-`Authorization: Bearer` header), or run it on their own machine over stdio with
-`wanpire mcp --url http://<pi-address>:8080`. Client configurations for both are in
+AI agents use the MCP at `http://<pi-address>:8080/mcp` (streamable HTTP, the account in an
+`Authorization: Basic` header), or run it on their own machine over stdio with
+`wanpire mcp --url http://<pi-address>:8080` and the account in `WANPIRE_USER` and
+`WANPIRE_PASSWORD`. Client configurations for both are in
 [`examples/mcp/`](examples/mcp/). The skill [`skills/wanpire/SKILL.md`](skills/wanpire/SKILL.md),
 in the open Agent Skills format, teaches an agent to share the box: lease, wait, apply, check,
 clear and release; copy its folder into your agent host's skills.

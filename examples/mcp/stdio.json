@@ -5,7 +5,8 @@
       "command": "wanpire",
       "args": ["mcp", "--url", "http://<pi-address>:8080"],
       "env": {
-        "WANPIRE_TOKEN": "${WANPIRE_TOKEN}"
+        "WANPIRE_USER": "${WANPIRE_USER}",
+        "WANPIRE_PASSWORD": "${WANPIRE_PASSWORD}"
       }
     }
   }
