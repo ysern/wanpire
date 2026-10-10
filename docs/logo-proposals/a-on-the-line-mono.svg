@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="wanpire, proposal A, one colour">
+  <title>wanpire, proposal A, one colour</title>
+  <mask id="m">
+    <rect width="128" height="128" fill="#fff"/>
+    <rect x="14" y="58" width="100" height="3" fill="#000"/>
+    <path d="M34 29 L56 35 M94 29 L72 35" stroke="#000" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="48" cy="44" r="11" fill="#000"/><circle cx="80" cy="44" r="11" fill="#000"/>
+    <circle cx="45" cy="47" r="4.5" fill="#fff"/><circle cx="77" cy="47" r="4.5" fill="#fff"/>
+    <path d="M42 72 H86 Q85 94 64 96 Q43 94 42 72 Z" fill="#000"/>
+    <path d="M50 72 L54.5 90 L59 72 Z M69 72 L73.5 90 L78 72 Z" fill="#fff"/>
+  </mask>
+  <g fill="#1d1f22" mask="url(#m)">
+    <rect x="12" y="70" width="6" height="12" rx="1.5"/><rect x="110" y="70" width="6" height="12" rx="1.5"/>
+    <rect x="18" y="56" width="92" height="50" rx="9"/>
+    <rect x="14" y="24" width="100" height="40" rx="18"/>
+  </g>
+  <path d="M2 110 C16 110 24 106 30 100" fill="none" stroke="#1d1f22" stroke-width="7" stroke-linecap="round"/>
+  <rect x="2" y="104" width="9" height="12" rx="1.5" fill="#1d1f22"/>
+</svg>

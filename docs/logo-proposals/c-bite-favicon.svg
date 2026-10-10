@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="wanpire, proposal C, favicon">
+  <title>wanpire, proposal C, favicon</title>
+  <clipPath id="h"><rect x="5" y="2" width="22" height="18" rx="5"/></clipPath>
+  <g clip-path="url(#h)">
+    <rect x="5" y="2" width="22" height="18" fill="#1d1f22"/>
+    <rect x="5" y="2" width="22" height="10" fill="#c9ccd1"/>
+  </g>
+  <circle cx="12" cy="8" r="3" fill="#ffffff"/><circle cx="20" cy="8" r="3" fill="#ffffff"/>
+  <circle cx="12.3" cy="8.8" r="1.4" fill="#1d1f22"/><circle cx="19.7" cy="8.8" r="1.4" fill="#1d1f22"/>
+  <rect x="10" y="21" width="12" height="9" rx="1.5" fill="#f2b134"/>
+  <path d="M11 15 L13 25 L15 15 Z M17 15 L19 25 L21 15 Z" fill="#ffffff" stroke="#1d1f22" stroke-width="0.8" stroke-linejoin="round"/>
+</svg>

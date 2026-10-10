@@ -677,3 +677,18 @@ it, both ends of a gradient included. It caught one rule that could not be kept 
 light grey for the sentence under each title is 2.4:1 on white, so it became a darker grey of
 the same family. Another test lists every request the page makes: nothing leaves the box, no
 web fonts, no icon sets, no scripts from elsewhere. 26 page tests in all, in 30 seconds.
+
+## 2026-10-10 — A face for the vampire
+
+The name came first, a pun: a vampire sitting on the WAN, sucking the traffic. So the logo is
+the box itself: a small computer in its case, two-tone, a grey rounded lid over a black base,
+with a cartoon face on the front. Big eyes on the lid, two fangs sunk into an Ethernet cable,
+and little packets draining from the cable into the mouth. One version adds a vampire's cape
+collar; a third is just a head biting a network plug, which survives being shrunk to a browser
+tab.
+
+The rules for it: a generic case, no product's name or logo; only the project's own drawing in
+the repository; legible at 16 pixels and in one colour. Each proposal is three hand-drawn SVGs,
+in the web page's wine red and amber: full colour, one colour, and a favicon redrawn on a
+32-pixel grid, since a scaled-down drawing turns to mush at that size. A contact sheet shows them
+all at 128, 32 and 16 px on light and dark. They wait for the owner to pick one.

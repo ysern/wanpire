@@ -13,6 +13,7 @@ reversed). Answered questions stay, marked answered.
 | O1 👤 | **The USB 3 gigabit Ethernet adapter**: plugged into a blue USB 3 port, and its model, so the hardware run can measure it in bridge mode | Needed for the hardware run only; nothing else waits on it |
 | O2 👤 | **The GitHub account `wanpire` exists** (created 2023, one repository, no description). Not a project, not on PyPI or npm; the PyPI name `wanpire` is free | Keep the name; optionally reserve `wanpire` on PyPI before the first release. Recommendation: keep |
 | O3 👤 | **Ask RIPE NCC and WonderNetwork for permission to ship derived figures?** Their data may be read, not shipped (RIPE Atlas: commercial use needs prior permission, and MIT allows commercial use; WonderNetwork: "please reach out") | Not asking: they calibrate the formula only, which is what the design does now. Asking: a much wider shipped table. Recommendation: not now; the CC BY and CC0 sources suffice to start |
+| O5 👤 | **Pick the logo** from the three proposals in `docs/logo-proposals/` (A: the case biting a cable; B: the same with a cape's collar; C: a minimal head biting a plug), or ask for changes | Recommendation: B for the README and the article, its favicon for the page; A if the collar is too much |
 | O4 👤 | **Ookla Open Data is CC BY-NC-SA 4.0**: redistributable, but not under MIT | Read only (the design's choice); or ship it as a separate, separately licensed data package. Recommendation: read only |
 
 ## Assumed
@@ -71,3 +72,4 @@ reversed). Answered questions stay, marked answered.
 | A50 ⚪ | The web page's palette is wanpire's own: a wine-red primary (`#a0213a` to `#6e1022`, white text 7.6:1 and 11.9:1) and a warm amber accent (`#f2b134`) for what is active, light and dark | A crimson brighter than AA allows for white text; a blue or teal primary |
 | A51 ⚪ | The grey sentence under each section title is `#646c71` (5.4:1 on white), not the style rules' `#a7a9ac` (2.4:1, below WCAG AA) | The rules' grey as written |
 | A52 ⚪ | The page's sections: Link (set the link, counters), Endpoints (places), Broker (holder and queue), Adapters (roles), Settings (access); from 720 px the side menu sits left, below it on top | Fewer sections; a settings page that changes the box (the API cannot yet) |
+| A53 ⚪ | Three logo proposals, hand-drawn SVG in the web page's palette, each in full colour, one colour (one ink, details cut out) and a favicon redrawn on a 32 px grid | More proposals; a raster contact sheet only |
