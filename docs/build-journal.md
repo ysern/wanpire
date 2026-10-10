@@ -512,3 +512,24 @@ drops beyond it. So bandwidth is now a `tbf` under the netem delay, with its que
 (`queue_ms`, 50 ms by default), and the counters tell the bottleneck's drops from wanpire's own.
 (One trap on the way: the kernel counts a child queue's drops in its parent's too, so netem's
 "dropped" included the bottleneck's until the engine subtracted them.)
+
+## 2026-10-10 — One driver at a time: the broker
+
+wanpire will be driven by people at a web page and by AI agents, often several at once. If two
+change the link together, neither measures what it asked for. So there is a **broker**, and it
+sits in the core rather than in any one interface, so the web page, the REST API and the MCP all
+see the same holder and the same queue.
+
+The rules fit in a paragraph. Ask for the link with who you are and why; you get a ticket. If
+the link is free, the ticket holds a **lease**; otherwise it waits in a queue, first come first
+served. Both are kept alive by use: a queued ticket that is not polled for a minute leaves the
+queue, and a lease without a call for two minutes ends. When a lease ends, for any reason, the
+link is cleared before the next in line gets it, so nobody inherits another's impairments. A
+person can end a lease by hand, and the agent holding it is told why on its next call.
+
+The point of the time limits is the crashed client. An agent that dies while waiting, or while
+holding the link, frees it within two minutes without anyone noticing, and the engine's own
+dead-man timer clears the line even if the server itself has died.
+
+The broker has no thread and never sleeps: the clock is passed in, and every call first works
+out what the passing time has done. Its 16 tests run in milliseconds by moving a fake clock.

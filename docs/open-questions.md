@@ -48,3 +48,7 @@ reversed). Answered questions stay, marked answered.
 | A27 ⚪ | A Wi-Fi outbound adapter (the Pi as an access point) is refused as not built yet | Building hostapd support now |
 | A28 ⚪ | Router mode's network defaults to `10.77.0.1/24`, DHCP `.100`–`.199`, dnsmasq bound to outbound only and run as root (its lease file lives in the root-owned `/run/wanpire`); unsolicited traffic from inbound to outbound is dropped, like a home router | `192.168.x` (likelier to clash with the line's own network); dnsmasq as its own user |
 | A29 ⚪ | A bridge port that carries an address is refused, never stripped; the install (B4) brings the ports up address-less | Removing the address at setup |
+| A30 ⚪ | The broker hands out an opaque random ticket; `who` and `purpose` are labels shown in the status, not identities | The client choosing its own id (two agents both called "agent" would share a lease) |
+| A31 ⚪ | When the link frees, the head of the queue holds the lease at once and its TTL starts then | Granting on its next poll (a second rule for the same thing) |
+| A32 ⚪ | The broker's state is in memory: a server restart ends every lease, and the boot-time clear leaves the line clean | Persisting leases to disk |
+| A33 ⚪ | If clearing the link fails when a lease ends, the lease still passes on and the error shows in the status; the dead-man still clears the line | Keeping the lease until the clear succeeds |
