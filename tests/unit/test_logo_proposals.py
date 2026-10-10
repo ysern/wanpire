@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 DIR = Path(__file__).resolve().parents[2] / "docs" / "logo-proposals"
-PROPOSALS = ["a-on-the-line", "b-count", "c-bite"]
+PROPOSALS = ["a-on-the-line", "b-count", "c-bite", "d-emblem"]
 FORMS = ["full", "mono", "favicon"]
 NS = "{http://www.w3.org/2000/svg}"
 

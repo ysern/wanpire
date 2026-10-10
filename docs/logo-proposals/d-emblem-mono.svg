@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="wanpire, proposal D: the emblem, one colour">
+  <title>wanpire, proposal D: the emblem, one colour</title>
+  <mask id="cut">
+    <rect width="128" height="128" fill="white"/>
+    <rect x="84" y="40" width="10" height="34" rx="1.5" fill="black"/>
+    <circle cx="44" cy="31" r="2.6" fill="black"/><circle cx="84" cy="31" r="2.6" fill="black"/>
+    <path d="M42 42 L59 48 M82 42 L65 48" stroke="black" stroke-width="4" stroke-linecap="round"/>
+    <path d="M42 52 Q50 44 60 53 Q50 62 42 52 Z M82 52 Q74 44 64 53 Q74 62 82 52 Z" fill="black"/>
+    <path d="M46 63 Q64 70 80 63 Q72 80 64 80 Q56 80 46 63 Z" fill="black"/>
+  </mask>
+  <mask id="gap">
+    <rect width="128" height="128" fill="white"/>
+    <rect x="33" y="20" width="62" height="68" rx="8" fill="black"/>
+  </mask>
+  <circle cx="64" cy="64" r="57" fill="none" stroke="#1d1f22" stroke-width="5"/>
+  <path d="M40 36 L14 50 L30 54 L18 72 L40 70 Z M88 36 L114 50 L98 54 L110 72 L88 70 Z" fill="#1d1f22" mask="url(#gap)"/>
+  <rect x="37" y="24" width="54" height="60" rx="6" fill="#1d1f22" mask="url(#cut)"/>
+  <path d="M47 24 V20 M53 24 V20 M59 24 V20 M65 24 V20 M71 24 V20 M77 24 V20" stroke="#1d1f22" stroke-width="3.5"/>
+  <path d="M84 51 H94 M84 62 H94" stroke="#1d1f22" stroke-width="2"/>
+  <circle cx="53.5" cy="53.5" r="3" fill="#1d1f22"/><circle cx="70.5" cy="53.5" r="3" fill="#1d1f22"/>
+  <path d="M51 66 L54 74 L57 67.5 Z M71 67.5 L74 74 L77 66 Z" fill="#1d1f22"/>
+  <g fill="none" stroke="#1d1f22" stroke-width="4" stroke-linecap="round">
+    <path d="M60 79 C60 88 48 92 48 104"/>
+    <path d="M64 80 C64 90 60 96 62 110"/>
+    <path d="M68 79 C68 88 80 92 80 104"/>
+    <path d="M10 88 H26 M102 88 H118"/>
+  </g>
+  <rect x="26" y="81" width="13" height="14" rx="2" fill="#1d1f22"/>
+  <path d="M39 84 H43 M39 88 H43 M39 92 H43 M85 84 H89 M85 88 H89 M85 92 H89" stroke="#1d1f22" stroke-width="2"/>
+  <rect x="89" y="81" width="13" height="14" rx="2" fill="#1d1f22"/>
+  <g fill="#1d1f22">
+    <rect x="40" y="106" width="5" height="5"/><rect x="47" y="112" width="4" height="4"/>
+    <rect x="55" y="113" width="4" height="4"/><rect x="69" y="111" width="4" height="4"/>
+    <rect x="78" y="106" width="5" height="5"/><rect x="84" y="112" width="4" height="4"/>
+  </g>
+</svg>

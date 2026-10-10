@@ -13,6 +13,7 @@ into the mouth. No product's name or mark. Colours from the web page: wine red `
 | **A, on the line**: the case's face biting a cable, packets draining in | <img src="a-on-the-line-full.svg" width="128"> | <img src="a-on-the-line-mono.svg" width="128"> | <img src="a-on-the-line-favicon.svg" width="32"> <img src="a-on-the-line-favicon.svg" width="16"> |
 | **B, the count**: A with a cape's collar and amber eyes | <img src="b-count-full.svg" width="128"> | <img src="b-count-mono.svg" width="128"> | <img src="b-count-favicon.svg" width="32"> <img src="b-count-favicon.svg" width="16"> |
 | **C, the bite**: a minimal head, fangs sunk into an Ethernet plug | <img src="c-bite-full.svg" width="128"> | <img src="c-bite-mono.svg" width="128"> | <img src="c-bite-favicon.svg" width="32"> <img src="c-bite-favicon.svg" width="16"> |
+| **D, the emblem** (from the owner's sketch, 2026-10-10): a green board with an angry face and a red cape, in a blue ring; fangs bite, blue cables drain into packets, a plug on each side. The sketch's single-board-computer maker's mark is left out (a trademark), and its own palette is kept: green `#23914a`, red `#e0202c`, blue `#18a8f2` on `#0e1116` | <img src="d-emblem-full.svg" width="128"> | <img src="d-emblem-mono.svg" width="128"> | <img src="d-emblem-favicon.svg" width="32"> <img src="d-emblem-favicon.svg" width="16"> |
 
 The one-colour forms use a single ink (near-black) with the eyes and fangs cut out, so they can
 be recoloured to any one colour, white on a dark ground included. The favicons are redrawn on a
