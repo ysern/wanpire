@@ -58,3 +58,8 @@ reversed). Answered questions stay, marked answered.
 | A37 ⚪ | The web UI's static files, `/docs` and `/openapi.json` are served without the token: they hold no data and describe a published API; every `/api/v1` route needs it | Guarding `/docs` too (it hides nothing that is not in the source) |
 | A38 ⚪ | The web page keeps the token in the browser's local storage once given ("Forget token" removes it), and its lease's ticket per tab; closing or reloading the page releases its lease | A login cookie; keeping the lease across a reload |
 | A39 ⚪ | The web page shows no scenarios, raw-figure form, mode or adapter mapping yet: the engine has no scenarios, and the API cannot change the mapping | Building them into this change |
+| A40 ⚪ | The MCP's agent carries its ticket (returned by `wanpire_lease`, passed to every change); the MCP runs stateless with JSON answers | A ticket kept per MCP session |
+| A41 ⚪ | On the box the MCP's tools reach the REST API through an HTTP transport bound to the app itself (no socket), so the token check and the broker are the REST API's whatever address the server listens on | A loopback socket (the server listens on the control address only) |
+| A42 ⚪ | `/mcp` needs the box's bearer token; the SDK's DNS-rebinding check is off because the token already stops a browser without it | Keeping the check, which would refuse the box's own name and addresses |
+| A43 ⚪ | The MCP offers no tool to end another client's lease: that is a person's decision, at the web page | A tool with a confirmation argument |
+| A44 ⚪ | The MCP SDK is pinned to its 2.x line (`mcp>=2.3,<3`), where the server class is `MCPServer` | The 1.x line (`FastMCP`) |

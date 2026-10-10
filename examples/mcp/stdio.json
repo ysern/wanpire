@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "wanpire": {
+      "type": "stdio",
+      "command": "wanpire",
+      "args": ["mcp", "--url", "http://<pi-address>:8080"],
+      "env": {
+        "WANPIRE_TOKEN": "${WANPIRE_TOKEN}"
+      }
+    }
+  }
+}

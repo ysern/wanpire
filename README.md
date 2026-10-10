@@ -14,7 +14,7 @@ controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports sho
 
 ## Status
 
-Early. The engine, the endpoint presets, the two modes, the broker, the REST API, a web page and a command line work; the MCP does not exist yet. What there is:
+Early. The engine, the endpoint presets, the two modes, the broker, the REST API, a web page, an MCP server for agents and a command line work. What there is:
 
 - the design and the first measurements: [`openspec/changes/design-the-link-emulator/`](openspec/changes/design-the-link-emulator/)
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
@@ -55,6 +55,11 @@ are listed in [`src/wanpire/api.py`](src/wanpire/api.py) and at `/docs` on the b
 The same server serves a web page at `http://<pi-address>:8080/`: give it the token once, pick
 the two ends and a channel for each, see the link's figures, ask for the link, apply, clear,
 read the counters and see who else is using the box.
+
+AI agents use the MCP at `http://<pi-address>:8080/mcp` (streamable HTTP, the same token in an
+`Authorization: Bearer` header), or run it on their own machine over stdio with
+`wanpire mcp --url http://<pi-address>:8080`. Client configurations for both are in
+[`examples/mcp/`](examples/mcp/).
 
 A link is cleared by itself after two minutes unless renewed (`wanpire renew`), so a
 forgotten one never lingers. Tests: `.venv/bin/pytest` (no root needed; the web page's tests run in a headless browser when

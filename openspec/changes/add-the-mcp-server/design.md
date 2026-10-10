@@ -38,6 +38,9 @@ Each lease answer carries `poll_every_s` (a third of the TTL) and a one-line `ne
 link and apply; or wait, say once that you wait, and poll. Errors are `ToolError`s with the REST
 API's own sentence, prefixed by what it means: an ended lease, another holder, an invalid link.
 
+Tools return `dict[str, Any]`, so the SDK sends structured content as well as the JSON text
+(a bare `dict` or `list` return type gives text only, a list one block per item).
+
 ### M4. `/mcp` on the box, behind the token
 
 The SDK's streamable HTTP handler is added as a route `/mcp` of the FastAPI app, wrapped in a

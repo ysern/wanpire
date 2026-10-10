@@ -3,7 +3,8 @@
     wanpire adapters
     wanpire up                       (the mode in /etc/wanpire/wanpire.json)
     wanpire down
-    wanpire serve                    (the REST API, on the control adapter's address)
+    wanpire serve                    (the REST API, the web page and the MCP, on the control address)
+    wanpire mcp --url http://<pi-address>:8080   (the MCP over stdio on a host; WANPIRE_TOKEN)
     wanpire endpoints
     wanpire preview london:consumer-fibre los-angeles:mobile-4g
     wanpire apply --adapter eth1 london:consumer-fibre los-angeles:mobile-4g
@@ -73,6 +74,25 @@ def _serve(a) -> int:
     return 0
 
 
+def _mcp(a) -> int:
+    """The MCP over stdio on a host, calling the box's REST API at ``--url``."""
+    import os
+    token = ""
+    if a.token_file:
+        try:
+            with open(os.path.expanduser(a.token_file), encoding="utf-8") as f:
+                token = f.read().strip()
+        except OSError:
+            token = ""
+    token = token or os.environ.get("WANPIRE_TOKEN", "").strip()
+    if not token:
+        raise ValueError("no token: put the box's token (/etc/wanpire/token on the box) in "
+                         "WANPIRE_TOKEN, or in a file named by --token-file")
+    from .mcp_server import make_mcp, rest_client
+    make_mcp(rest_client(a.url, token)).run("stdio")
+    return 0
+
+
 def make_modes():
     from .modes import Modes
     return Modes()
@@ -103,6 +123,9 @@ def _parser() -> argparse.ArgumentParser:
     sv.add_argument("--host", help="listen here instead of the control adapter's address")
     sv.add_argument("--port", type=int, default=8080)
     sv.add_argument("--netns", help="the namespace the outbound adapter lives in (test beds)")
+    mc = sub.add_parser("mcp", help="run the MCP over stdio here, calling the box's REST API")
+    mc.add_argument("--url", required=True, help="the box, e.g. http://<pi-address>:8080")
+    mc.add_argument("--token-file", help="a file holding the box's token (else WANPIRE_TOKEN)")
     for name, text in (("up", "set up the configured mode (bridge or router)"),
                        ("down", "tear down whatever either mode set up")):
         m = sub.add_parser(name, help=text)
@@ -140,6 +163,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if a.command == "serve":
             return _serve(a)
+        if a.command == "mcp":
+            return _mcp(a)
         if a.command in ("up", "down"):
             adapters = {x.name: x for x in list_adapters()}
             cfg = load_config(a.config, adapters)

@@ -15,6 +15,7 @@ broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ti
     GET    /api/v1/endpoints/{id}    one preset document
     POST   /api/v1/preview           {"near", "far"} -> the link and how it was worked out
     GET    /api/v1/adapters          every adapter, its facts and its role
+    POST   /mcp                      the MCP (streamable HTTP), its tools calling the routes above
 
 The web UI's static files are served at ``/`` without the token: they hold no data, and the
 page itself calls the routes above with the token.
@@ -30,6 +31,7 @@ from pathlib import Path
 from fastapi import Body, Depends, FastAPI, Header, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.routing import Route
 
 from . import catalogue
 from .broker import Broker, LeaseEnded, NotHolder, UnknownTicket
@@ -48,11 +50,46 @@ class _Status(Exception):
         self.code = code
 
 
+def _mcp_http_handler(mcp):
+    """The SDK's streamable HTTP handler for ``mcp``: stateless, JSON answers."""
+    from mcp.server.transport_security import TransportSecuritySettings
+    http = mcp.streamable_http_app(
+        streamable_http_path="/mcp", stateless_http=True, json_response=True,
+        # the bearer token stops a browser without it; the host check would only refuse
+        # the box's own name and addresses
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+    return next(r.endpoint for r in http.routes if getattr(r, "path", None) == "/mcp")
+
+
+class _Guard:
+    """An ASGI app: the box's bearer token, then the MCP's handler."""
+
+    def __init__(self, token: str, handler: list):
+        self._token = token.encode()
+        self._handler = handler
+
+    async def __call__(self, scope, receive, send):
+        given = dict(scope.get("headers") or []).get(b"authorization", b"")
+        scheme, _, value = given.partition(b" ")
+        if scheme.lower() != b"bearer" or not secrets.compare_digest(value, self._token):
+            await JSONResponse({"error": "a bearer token is needed"}, status_code=401)(
+                scope, receive, send)
+            return
+        if not self._handler:
+            await JSONResponse({"error": "the MCP is starting"}, status_code=503)(
+                scope, receive, send)
+            return
+        await self._handler[0](scope, receive, send)
+
+
 def create_app(engine, broker: Broker, config: Config, token: str, list_adapters,
-               tick_s: float | None = 5.0) -> FastAPI:
+               tick_s: float | None = 5.0, with_mcp: bool = True) -> FastAPI:
     if not token:
         raise ValueError("the API needs a token")
     outbound = config.outbound[0]
+
+    mcp = None
+    mcp_handler = []  # the MCP's HTTP handler, made afresh each time the app starts
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
@@ -63,7 +100,12 @@ def create_app(engine, broker: Broker, config: Config, token: str, list_adapters
                     await asyncio.sleep(tick_s)
                     broker.status()  # settles expired leases and requests
             task = asyncio.create_task(tick())
-        yield
+        if mcp is None:
+            yield
+        else:
+            mcp_handler[:] = [_mcp_http_handler(mcp)]
+            async with mcp.session_manager.run():
+                yield
         if task:
             task.cancel()
 
@@ -191,6 +233,16 @@ def create_app(engine, broker: Broker, config: Config, token: str, list_adapters
     def adapters():
         return [dict(a.to_dict(), role=config.role(a.name)) for a in list_adapters()]
 
-    # last, so /api/v1, /docs and /openapi.json win
+    # the MCP: a client of the routes above, through the app itself (no socket)
+    if with_mcp:
+        import httpx
+
+        from .mcp_server import make_mcp, rest_client
+        mcp = make_mcp(rest_client("http://wanpire", token,
+                                   transport=httpx.ASGITransport(app=app)))
+        app.state.mcp = mcp
+        app.router.routes.append(Route("/mcp", endpoint=_Guard(token, mcp_handler)))
+
+    # last, so /api/v1, /mcp, /docs and /openapi.json win
     app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
     return app

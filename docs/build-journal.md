@@ -581,3 +581,32 @@ fake engine: 16 of them, written before the page, including one that fails if an
 sideways on a 360-pixel phone. Then the real thing, through an SSH tunnel to the Pi and a
 namespace test bed: a ping across the bed went from 0.12 ms to 196 ms when the page applied
 London to Los Angeles on 4G (twice 98.8 ms, as previewed), and back to 0.12 ms when it released.
+
+## 2026-10-10 — Agents get their own door: the MCP
+
+The point of wanpire, for me, is that an AI agent testing a piece of software can say "make
+this a bad 4G line to Sydney" and get it. Agents speak MCP, the Model Context Protocol, so the
+box now has an MCP server: nine tools (status, endpoints, lease, poll, describe, apply, clear,
+counters, release), each a few lines that call the REST API. Nothing in it reaches the engine
+directly. On the box the tools even call the API over HTTP, through a transport bound to the
+application itself, so the token is checked and the broker decides exactly as for anyone else.
+
+Two small design choices made it simple. The agent carries its own ticket: `wanpire_lease`
+returns it and every change takes it, so the MCP server keeps no state and a reconnecting agent
+loses nothing. And every answer says what to do next: "Queued at position 1. Say once that you
+are waiting for the link, then call wanpire_poll every 20 s until you hold it."
+
+There is deliberately no tool to end somebody else's lease. An agent that wants the box must
+wait; a person at the web page can decide otherwise.
+
+The same package runs on a laptop too: `wanpire mcp --url http://<pi-address>:8080` serves the
+tools over stdio and calls the box across the network. The owner asked whether that would save
+the Pi's CPU. It would not, measurably: the MCP sleeps between calls, and the Pi's work is the
+kernel's, delaying and forwarding packets.
+
+Tried for real against the namespace bed on the Pi, from the laptop through a tunnel: an MCP
+client leased the link, described London to Sydney (139 ms each way), applied it, and a ping
+across the bed went from 0.12 ms to 279 ms; it cleared and released, and the ping was back at
+0.12 ms. The same through `wanpire mcp` over stdio. The SDK had just moved to a 2.x line that
+renamed its server class, which cost ten minutes of reading the installed package rather than
+the internet's examples.
