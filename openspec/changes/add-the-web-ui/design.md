@@ -26,8 +26,9 @@ templates: the page would then be a second interface to the core instead of a cl
 ### U2. The token and the ticket in the browser
 
 The page asks for the token once and keeps it in `localStorage`, so a phone does not ask every
-visit; "Forget token" removes it. The lease's ticket lives in `sessionStorage`: a reload keeps
-its place in the queue, a second tab is a second client. Static files, `/docs` and
+visit; "Forget token" removes it. The lease's ticket lives in `sessionStorage`, one per tab, so a
+second tab is a second client. Closing or reloading the page releases its lease (U3): a page that
+is not open cannot keep a link it is not watching. Static files, `/docs` and
 `/openapi.json` need no token: they hold no data, and the same text is in the source.
 
 Not taken: a login cookie (a second way to authenticate, and agents do not keep cookies); guarding
@@ -39,6 +40,9 @@ The page refreshes the status every 5 s. While it has a ticket it polls it at a 
 lease's TTL (the same rule the skill gives agents), and on `pagehide` it releases with a
 `keepalive` request. A browser that dies without that is covered by the broker's TTL and the
 engine's dead-man, like any other client.
+
+Not taken: keeping the lease across a reload (the page would have to tell a reload from a
+close, and a link left applied by a closed tab is what the broker exists to prevent).
 
 ### U4. Who the page is
 
@@ -58,7 +62,8 @@ No icons where a word will do, no animation, no web fonts.
 
 `tests/ui/` starts uvicorn in a thread on a free port with the real `create_app`, the recording
 engine and a real broker (a real clock, short TTLs where a test needs one), and drives the page
-with Playwright's headless Chromium. `confirm()` and `prompt()` are answered through Playwright's
+with Playwright's headless Chromium. Ending another's lease is one `prompt()`, which is both the confirmation (OK or
+Cancel) and the reason; it is answered through Playwright's
 dialog handler. The tests skip if Playwright or its browser is missing, so the unit suite still
 runs on a bare Pi.
 

@@ -14,7 +14,7 @@ controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports sho
 
 ## Status
 
-Early. The engine, the endpoint presets, the two modes, the broker, the REST API and a command line work; the web UI and the MCP do not exist yet. What there is:
+Early. The engine, the endpoint presets, the two modes, the broker, the REST API, a web page and a command line work; the MCP does not exist yet. What there is:
 
 - the design and the first measurements: [`openspec/changes/design-the-link-emulator/`](openspec/changes/design-the-link-emulator/)
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
@@ -52,8 +52,13 @@ ask for a lease (`POST /api/v1/lease`), keep it by polling (`POST /api/v1/lease/
 the link with its ticket (`PUT /api/v1/link`), release it (`DELETE /api/v1/lease`). The routes
 are listed in [`src/wanpire/api.py`](src/wanpire/api.py) and at `/docs` on the box.
 
+The same server serves a web page at `http://<pi-address>:8080/`: give it the token once, pick
+the two ends and a channel for each, see the link's figures, ask for the link, apply, clear,
+read the counters and see who else is using the box.
+
 A link is cleared by itself after two minutes unless renewed (`wanpire renew`), so a
-forgotten one never lingers. Tests: `.venv/bin/pytest` (no root needed), and with real packets
+forgotten one never lingers. Tests: `.venv/bin/pytest` (no root needed; the web page's tests run in a headless browser when
+`pip install -e ".[ui-test]" && python -m playwright install chromium` has been done), and with real packets
 in network namespaces, `sudo .venv/bin/python -m pytest tests/netns`.
 
 The project is planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec):

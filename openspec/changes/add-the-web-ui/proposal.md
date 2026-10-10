@@ -28,7 +28,7 @@ Assumed here (also in `docs/open-questions.md`):
   data, and the API they describe is published with the source; every route under `/api/v1`
   still needs it;
 - the token is kept in the browser's local storage once entered, the ticket in its session
-  storage (one tab, one ticket);
+  storage (one tab, one ticket), and closing or reloading the page releases its lease;
 - the page polls its ticket at a third of the TTL only while it is open, and releases its lease
   when the page is closed; the box's dead-man covers a browser that dies;
 - scenarios are not shown: the engine has none yet.

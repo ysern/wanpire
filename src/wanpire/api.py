@@ -15,6 +15,9 @@ broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ti
     GET    /api/v1/endpoints/{id}    one preset document
     POST   /api/v1/preview           {"near", "far"} -> the link and how it was worked out
     GET    /api/v1/adapters          every adapter, its facts and its role
+
+The web UI's static files are served at ``/`` without the token: they hold no data, and the
+page itself calls the routes above with the token.
 """
 
 from __future__ import annotations
@@ -22,9 +25,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import secrets
+from pathlib import Path
 
 from fastapi import Body, Depends, FastAPI, Header, Request
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from . import catalogue
 from .broker import Broker, LeaseEnded, NotHolder, UnknownTicket
@@ -34,6 +39,7 @@ from .model import InvalidLink, Link
 from .presets import InvalidPreset
 
 TICKET = "X-Wanpire-Ticket"
+WEB = Path(__file__).parent / "web"
 
 
 class _Status(Exception):
@@ -185,4 +191,6 @@ def create_app(engine, broker: Broker, config: Config, token: str, list_adapters
     def adapters():
         return [dict(a.to_dict(), role=config.role(a.name)) for a in list_adapters()]
 
+    # last, so /api/v1, /docs and /openapi.json win
+    app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
     return app

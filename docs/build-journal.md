@@ -556,3 +556,28 @@ is cleared by a systemd timer even if the server itself has died.
 Tried for real on the Pi, against a namespace test bed: no token, 401; ask for the lease, get
 it; put London to New York; a ping across the box goes from 0.1 ms to 84 ms; release, and the
 link is gone. 179 unit tests run on the laptop in under four seconds.
+
+## 2026-10-10 — A web page, like a router's
+
+A person should not need `curl` to slow a line down. The box now serves a page at its own
+address: give it the token once, pick two places and a channel for each (London on its generic
+line, Los Angeles on 4G), and it shows what the link will be both ways before anything changes:
+98.8 ms each way, 8 ms of jitter, 0.6% loss in bursts of three, 8 Mbit/s down and 8.9 up, and
+where the 142 ms path came from. Ask for the link, apply, and the counters start moving.
+
+The look is deliberately boring: the admin page of a home router, the kind everybody has used.
+One column, system fonts, white or near-black depending on the phone's setting, one blue for
+actions, red only for the one button that ends somebody else's lease, green and amber only for
+state. Three files, no framework, no build step: about 350 lines of plain JavaScript that call
+the same REST API an agent would. The page gets no shortcut into the box.
+
+It is a polite client, too. It holds a lease like everybody else, polls it at a third of its
+lifetime only while it is open, and gives the link back when the tab is closed. Ending an agent's
+lease by hand takes a confirmation and a reason, and the agent is told that reason on its next
+call.
+
+The tests drive the page in a headless Chromium (Playwright) against the real server with a
+fake engine: 16 of them, written before the page, including one that fails if anything scrolls
+sideways on a 360-pixel phone. Then the real thing, through an SSH tunnel to the Pi and a
+namespace test bed: a ping across the bed went from 0.12 ms to 196 ms when the page applied
+London to Los Angeles on 4G (twice 98.8 ms, as previewed), and back to 0.12 ms when it released.

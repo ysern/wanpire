@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>wanpire</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <span class="brand">wanpire</span>
+  <span class="tagline">link emulator</span>
+  <button id="forget" class="link" type="button" hidden>Forget token</button>
+</header>
+
+<main>
+  <section id="signin" hidden>
+    <h2>Sign in</h2>
+    <p>The box's token is in <code>/etc/wanpire/token</code> on the box.</p>
+    <form id="token-form" class="form">
+      <label for="token">Token</label>
+      <input id="token" type="password" autocomplete="current-password" required>
+      <label for="name">Your name</label>
+      <input id="name" type="text" autocomplete="nickname" placeholder="shown to others as web: name" required>
+      <span></span>
+      <button id="token-save" type="submit" class="primary">Sign in</button>
+    </form>
+    <p id="token-error" class="bad" role="alert"></p>
+  </section>
+
+  <div id="app" hidden>
+    <section class="status" aria-label="Status">
+      <table class="facts">
+        <tr><th>Mode</th><td id="mode">-</td></tr>
+        <tr><th>Link</th><td id="link-state">-</td></tr>
+        <tr><th>Held by</th><td id="holder">-</td></tr>
+        <tr><th>Queue</th><td id="queue-count">-</td></tr>
+      </table>
+    </section>
+
+    <p id="message" role="status"></p>
+
+    <section>
+      <h2>Link</h2>
+      <div class="form">
+        <label for="near-endpoint">Near end (the device)</label>
+        <div class="pair">
+          <select id="near-endpoint"></select>
+          <select id="near-channel" aria-label="Near end's channel"></select>
+        </div>
+        <label for="far-endpoint">Far end (the network)</label>
+        <div class="pair">
+          <select id="far-endpoint"></select>
+          <select id="far-channel" aria-label="Far end's channel"></select>
+        </div>
+      </div>
+      <table class="figures" id="preview">
+        <thead><tr><th></th><th>Down</th><th>Up</th></tr></thead>
+        <tbody>
+          <tr><th>Delay, ms</th><td id="down-delay_ms">-</td><td id="up-delay_ms">-</td></tr>
+          <tr><th>Jitter, ms</th><td id="down-jitter_ms">-</td><td id="up-jitter_ms">-</td></tr>
+          <tr><th>Loss, %</th><td id="down-loss">-</td><td id="up-loss">-</td></tr>
+          <tr><th>Bandwidth, Mbit/s</th><td id="down-rate_mbit">-</td><td id="up-rate_mbit">-</td></tr>
+        </tbody>
+      </table>
+      <p id="path" class="note"></p>
+    </section>
+
+    <section>
+      <h2>Lease</h2>
+      <p id="lease-state">You do not hold the link.</p>
+      <div class="form">
+        <label for="purpose">Purpose</label>
+        <input id="purpose" type="text" placeholder="what you are testing">
+      </div>
+      <div class="actions">
+        <button id="ask" type="button">Ask for the link</button>
+        <button id="apply" type="button" class="primary" disabled>Apply</button>
+        <button id="clear" type="button" disabled>Clear</button>
+        <button id="release" type="button" disabled>Release</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Counters</h2>
+      <table class="figures" id="counters">
+        <thead><tr><th></th><th>Down</th><th>Up</th></tr></thead>
+        <tbody>
+          <tr><th>Packets</th><td id="c-down-packets">-</td><td id="c-up-packets">-</td></tr>
+          <tr><th>Bytes</th><td id="c-down-bytes">-</td><td id="c-up-bytes">-</td></tr>
+          <tr><th>Dropped by wanpire</th><td id="c-down-dropped">-</td><td id="c-up-dropped">-</td></tr>
+          <tr><th>Dropped by the bandwidth's queue</th><td id="c-down-shaper_dropped">-</td><td id="c-up-shaper_dropped">-</td></tr>
+          <tr><th>Queued now</th><td id="c-down-queued">-</td><td id="c-up-queued">-</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Who is using the box</h2>
+      <table class="list" id="queue">
+        <thead><tr><th></th><th>Who</th><th>Purpose</th><th>For</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="actions">
+        <button id="end-lease" type="button" class="danger" hidden>End this lease</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>wanpire · <a href="docs">API</a></footer>
+<script src="app.js"></script>
+</body>
+</html>
