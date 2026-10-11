@@ -53,7 +53,34 @@ a link through a restart. A client whose ticket is unknown is told to ask again.
 
 Every public method holds one `threading.Lock`: FastAPI runs plain functions in a thread pool.
 
+### K7. A lease for a length of time, or until released (the owner, 2026-10-11)
+
+The first version had one kind of lease, alive while its holder calls: right for an agent, and
+for a web page that keeps its link only while it is open. The owner asked to lease the link for a
+chosen time instead, from the page: until released, 10 min, 30 min, 1 h, 5 h, 1 day, 1 week. So a
+request carries a `hold`: none (the lease lives while used, as before), a number of seconds
+(60 s to 7 days), or until released.
+
+- **A timed or open-ended lease needs no calls.** It ends at its length counted from the grant,
+  when released, or when ended by hand; a lease until released never expires by time. What a
+  person chose is honoured while they close the laptop.
+- **The dead-man follows the lease.** A link is applied with the lease's remaining time as its
+  dead-man lifetime, so a timed link is cleared at its end even if the server has died; a link
+  held until released has no dead-man, and is cleared by a release, by hand, or at boot.
+- **Queued requests still poll.** A place in the queue is held only by someone still waiting;
+  a timed request starts its time when granted, not when asked.
+- **The status** gives each lease's and request's hold, and the holder's remaining time, for the
+  Broker page.
+
+Not taken: a maximum length for every lease (until released is what the owner listed first, and
+ending by hand is always there); the time counted from the request (a queued hour would be spent
+waiting).
+
 ## Risks / Trade-offs
+
+- **A lease until released, forgotten,** keeps the box from everyone. → The holder, its purpose
+  and how long it has held are on the Broker page, and anyone signed in can end it by hand with a
+  reason.
 
 - **A lease outlives a silent holder by up to its TTL** (120 s). → Configurable; the skill tells
   agents to release as soon as they are done.

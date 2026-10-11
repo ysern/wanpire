@@ -145,6 +145,25 @@ def test_no_sideways_scroll_and_aa_contrast(browser, box, width, scheme):
         context.close()
 
 
+@pytest.mark.parametrize("live", [False, True])
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_the_band_is_readable_calm_and_live(browser, box, live, scheme):
+    context = browser.new_context(viewport={"width": 1280, "height": 900}, color_scheme=scheme)
+    page = context.new_page()
+    page.set_default_timeout(5000)
+    page.box = box
+    try:
+        box.engine.applied = live
+        sign_in(page)
+        expect(page.locator("#mode")).to_have_text("bridge")
+        expect(page.locator("#band-link")).to_have_text("link applied" if live else "no link")
+        result = page.evaluate(CONTRAST_JS)
+        band = [f for f in result["failures"] if "band" in f or "ring" in f or "brand" in f]
+        assert result["failures"] == [], f"live={live}: {result['failures']} {band}"
+    finally:
+        context.close()
+
+
 @pytest.mark.parametrize("width", [360, 1280])
 @pytest.mark.parametrize("scheme", ["light", "dark"])
 def test_the_setup_card_is_readable(browser, new_box, width, scheme):

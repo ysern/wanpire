@@ -71,6 +71,28 @@ current and a new password SHALL change it and end every other session.
 - **WHEN** the password is changed with the right current one
 - **THEN** the old password is refused and the new one accepted
 
+### Requirement: The status names the link applied
+
+`GET /api/v1/status` SHALL carry `applied`: the two ends with their channels resolved when the
+link was applied from ends (`{"near": "london:generic", "far": "los-angeles:mobile-4g"}`),
+`{"figures": true}` when it was applied from raw figures, and `null` when the engine reports
+no link applied, whatever cleared it.
+
+#### Scenario: Applied from two ends
+- **GIVEN** the holder applied `{"near": "london", "far": "los-angeles:mobile-4g"}`
+- **WHEN** anyone reads the status
+- **THEN** `applied` is `{"near": "london:generic", "far": "los-angeles:mobile-4g"}`, London's default channel resolved
+
+#### Scenario: Applied from figures
+- **GIVEN** the holder applied `{"down": {"delay_ms": 40}, "up": {"delay_ms": 40}}`
+- **WHEN** anyone reads the status
+- **THEN** `applied` is `{"figures": true}`
+
+#### Scenario: Cleared, by hand or by the broker
+- **GIVEN** a link applied from two ends
+- **WHEN** the holder clears it, or its lease ends and the broker clears it, and the status is read
+- **THEN** `applied` is `null`
+
 ### Requirement: Asking, polling and releasing the lease
 
 `POST /api/v1/lease` with `who` and `purpose` SHALL return a ticket and whether it holds the
@@ -111,10 +133,26 @@ no ticket.
 - **WHEN** the holder puts a link with 120% loss
 - **THEN** the answer is 422 naming `loss_pct`
 
+### Requirement: A lease can be asked for a length of time
+
+`POST /api/v1/lease` MAY carry `hold`: a number of seconds from 60 to 604,800, or
+`"until-released"`; without it the lease lives while used. Any other value SHALL be answered 422.
+The status SHALL give the holder's and each request's `hold`, and the holder's `remaining_s`
+(`null` until released).
+
+#### Scenario: An hour
+- **WHEN** A posts `{"who": "web: admin", "purpose": "demo", "hold": 3600}` to a free link
+- **THEN** A holds the lease, and the status gives `hold` 3600 and `remaining_s` 3600
+
+#### Scenario: A length out of range
+- **WHEN** a request carries `"hold": 10`
+- **THEN** the answer is 422 naming the range
+
 ### Requirement: The lease drives the dead-man
 
 A link SHALL be applied with the lease's TTL as its dead-man lifetime, and every poll by the
-holder SHALL renew the dead-man while a link is applied.
+holder SHALL renew the dead-man while a link is applied. Under a timed lease the lifetime SHALL be
+the lease's remaining time; under a lease until released there SHALL be no dead-man.
 
 #### Scenario: The holder polls
 - **GIVEN** A holds the lease and has applied a link

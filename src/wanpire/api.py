@@ -271,10 +271,17 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
 
     # -- the box ----------------------------------------------------------------------------
 
+    # how the link now applied was described (R7); dropped once the engine reports none
+    described: list = [None]
+
     @app.get(f"{api}/status", dependencies=auth)
     def status():
-        return {"mode": config.mode, "outbound": outbound, "link": engine.read(outbound),
-                "broker": broker.status()}
+        b = broker.status()  # first: it may clear an expired lease's link
+        link = engine.read(outbound)
+        if not (link["down"].get("applied") or link["up"].get("applied")):
+            described[0] = None
+        return {"mode": config.mode, "outbound": outbound, "link": link,
+                "applied": described[0], "broker": b}
 
     @app.post(f"{api}/lease", dependencies=auth)
     def ask(body: dict = Body(...)):
@@ -321,6 +328,9 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
         else:
             link = Link.from_dict({k: body[k] for k in figures})
         engine.apply(outbound, link, lifetime_s=broker.lease_ttl_s)
+        described[0] = ({"figures": True} if account is None else
+                        {end: f"{account[end]['endpoint']}:{account[end]['channel']}"
+                         for end in ("near", "far")})
         out = {"link": link.to_dict()}
         if account:
             out["account"] = account
@@ -330,6 +340,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
     def clear_link(ticket: str = Depends(ticket_of)):
         broker.require(ticket)
         engine.clear(outbound)
+        described[0] = None
         return Response(status_code=204)
 
     @app.get(f"{api}/endpoints", dependencies=auth)

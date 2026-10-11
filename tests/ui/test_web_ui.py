@@ -188,6 +188,68 @@ def test_the_preview_shows_the_figures_and_leaves_the_link_alone(page):
     assert page.box.engine.calls == []
 
 
+# -- the band says what the box is doing ----------------------------------------------------
+
+REFRESH_MS = 8000  # the page reads the status every 5 s
+
+
+def agent_applies(box, body):
+    ticket = agent_asks(box, "agent-7", "band check")
+    r = httpx.put(box.url + "/api/v1/link", json=body,
+                  headers={**AUTH, "X-Wanpire-Ticket": ticket})
+    assert r.status_code == 200, r.text
+    return ticket
+
+
+def test_the_band_is_calm_with_no_link(page):
+    sign_in(page)
+    expect(page.locator("#mode")).to_have_text("bridge")
+    expect(page.locator("#band-link")).to_have_text("no link")
+    expect(page.locator("header.band")).not_to_have_class(re.compile(r"\blive\b"))
+
+
+def test_the_band_follows_another_clients_link(page):
+    sign_in(page)
+    expect(page.locator("#band-link")).to_have_text("no link")
+    agent_applies(page.box, {"near": "london", "far": "los-angeles"})
+    page.reload()  # the agent's lease (3 s here) would end before the 5 s refresh
+    expect(page.locator("#band-link")).to_have_text("london:generic <> los-angeles:generic")
+    expect(page.locator("header.band")).to_have_class(re.compile(r"\blive\b"))
+    # the agent stops polling: its lease ends, the broker clears the link, the band follows
+    expect(page.locator("#band-link")).to_have_text("no link", timeout=REFRESH_MS)
+    expect(page.locator("header.band")).not_to_have_class(re.compile(r"\blive\b"))
+
+
+def test_the_band_says_figures(page):
+    agent_applies(page.box, {"down": {"delay_ms": 40}, "up": {"delay_ms": 40}})
+    sign_in(page)
+    expect(page.locator("#band-link")).to_have_text("set by figures")
+    expect(page.locator("header.band")).to_have_class(re.compile(r"\blive\b"))
+
+
+def test_the_band_changes_at_once_on_this_pages_apply(page):
+    sign_in(page)
+    pick(page)
+    page.fill("#purpose", "band check")
+    page.click("#ask")
+    expect(page.locator("#lease-state")).to_contain_text("You hold the link")
+    page.click("#apply")
+    expect(page.locator("#band-link")).to_have_text("london:generic <> los-angeles:mobile-4g",
+                                                    timeout=2000)
+    page.click("#clear")
+    expect(page.locator("#band-link")).to_have_text("no link", timeout=2000)
+
+
+def test_the_band_line_sits_under_the_logo_on_its_left(page):
+    page.set_viewport_size({"width": 1280, "height": 900})
+    sign_in(page)
+    expect(page.locator("#mode")).to_have_text("bridge")
+    brand = page.locator("#band .brand").bounding_box()
+    line = page.locator("#band-link").bounding_box()
+    assert line["y"] >= brand["y"] + brand["height"] - 1
+    assert abs(line["x"] - brand["x"]) < 2
+
+
 # -- the lease ------------------------------------------------------------------------------
 
 def test_ask_apply_clear_release(page):

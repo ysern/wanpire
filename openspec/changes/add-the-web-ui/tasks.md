@@ -32,3 +32,8 @@
 - [x] 5.2 Failing tests: set up on a new box (made, signed in; passwords differ; too short); sign in, wrong password, coming back, sign out; change the password; no credential in the browser's storage
 - [x] 5.3 `index.html`, `style.css`, `app.js` until green; the look tests still pass
 - [x] 5.4 Try it on the Pi; journal, open questions
+
+## 6. The band shows the link (U7, the owner, 2026-10-11)
+
+- [ ] 6.1 Failing tests: the band's line from ends, from figures and with none, following another client's apply and clear; pastel when none, wine red when applied; AA contrast on the band in both states and themes
+- [ ] 6.2 `index.html`, `style.css`, `app.js` until green; try it on the Pi

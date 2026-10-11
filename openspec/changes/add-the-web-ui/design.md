@@ -106,6 +106,22 @@ The style is taken; nobody's brand is.
 Not taken: a CSS framework or an icon font (a fetch, a licence and a dependency for a few
 glyphs); the first version's single column (the owner's rules supersede it).
 
+### U7. The band shows the link (the owner, 2026-10-11)
+
+What the box was doing was a word in the status card ("impaired") and a passing message
+("Applied: london:generic to los-angeles:generic."), easy to miss and gone at the next action.
+The owner asked for it to be impossible to miss: the band itself now says it, on a line under the
+logo aligned to its left, from the status's `applied` (R7 of `add-the-rest-api`), and changes
+colour with it. With no link the band is a calm pastel of the same wine (`#f7e6ea` to
+`#efd3da`, its text and icons in dark wine `#5a0d1c`, about 12:1); with a link it is the wine-red
+gradient U5 gave it, white on it. The dark theme does the same with a muted plum (`#2b2427` to
+`#231c1f`, text `#ecd7dc`) against the dark wine. The line is short, in the API's own form,
+as the owner asked: `london:generic <> los-angeles:generic`, `set by figures`, or `no link`. The
+message line keeps a short acknowledgement only.
+
+Not taken: a banner inside the Link page (only that page shows it); a coloured dot (small, and
+it says nothing of which link); keeping the band red always (the red then carries no meaning).
+
 ### U6. Tests in a browser, against the real app
 
 `tests/ui/` starts uvicorn in a thread on a free port with the real `create_app`, the recording

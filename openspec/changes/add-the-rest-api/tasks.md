@@ -23,3 +23,8 @@
 - [x] 4.3 Failing tests: Basic (none, wrong, right); session (sign in, cookie alone, sign out, password change ends other sessions)
 - [x] 4.4 Implement `account.py` and the routes until green; replace the token everywhere it was taken
 - [x] 4.5 `wanpire account set|reset`; `serve` starts without an account
+
+## 5. The status names the link applied (R7, the owner, 2026-10-11)
+
+- [ ] 5.1 Failing tests: `applied` from ends (channels resolved), from figures, null after a clear by hand and by the broker
+- [ ] 5.2 Implement in `api.py` until green

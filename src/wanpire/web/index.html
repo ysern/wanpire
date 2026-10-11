@@ -42,11 +42,14 @@
 </div>
 
 <div id="app" hidden>
-  <header class="band">
+  <header class="band" id="band">
     <div class="band-inner">
-      <div class="brand">
-        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-mark"/></svg>
-        <div><span class="name">wanpire</span><span class="tagline">link emulator</span></div>
+      <div class="band-left">
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-mark"/></svg>
+          <div><span class="name">wanpire</span><span class="tagline">link emulator</span></div>
+        </div>
+        <p id="band-link" class="band-link" role="status" aria-label="The link applied now">no link</p>
       </div>
       <nav class="sections" aria-label="Sections">
         <a id="nav-link" href="#link"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-link"/></svg></span><span class="label">Link</span></a>

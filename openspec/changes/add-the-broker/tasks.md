@@ -10,3 +10,8 @@
 ## 2. Close
 
 - [x] 2.1 Journal and open questions
+
+## 3. A lease for a length of time (K7, the owner, 2026-10-11)
+
+- [ ] 3.1 Failing tests: a timed lease holds without calls and ends at its length, told why; until released never expires; counted from the grant; the status gives the hold and the time remaining; a queued timed request still polls
+- [ ] 3.2 `broker.py` until green; the REST API's `hold` and the dead-man (rest-api R8); the page's dropdown and Remaining column (web-ui U8)

@@ -52,6 +52,31 @@ the queue, whose lease TTL starts then.
 - **WHEN** A releases it
 - **THEN** the link is cleared and free
 
+### Requirement: A lease can be asked for a length of time, or until released
+
+A request MAY name how long its lease holds: a number of seconds (from 60 s to 7 days), or
+until released. Such a lease SHALL need no call from its holder: a timed one SHALL end at its
+length counted from when it was granted, one until released only when released or ended by
+hand. A request that names neither SHALL be a lease that lives while used, as above. The
+status SHALL say each lease's and each request's length, and the holder's time remaining.
+While queued, every request SHALL still be polled.
+
+#### Scenario: An hour
+- **GIVEN** A asks for the link for 3,600 s and is granted it
+- **WHEN** A makes no call for 3,599 s
+- **THEN** A still holds the lease, with 1 s remaining; at 3,600 s it ends, the link is
+  cleared, and A's next call is told its hour ended
+
+#### Scenario: Until released
+- **GIVEN** A asks for the link until released
+- **WHEN** a day passes with no call from A
+- **THEN** A still holds the lease, and the status says it holds until released
+
+#### Scenario: Counted from the grant
+- **GIVEN** B is queued behind A for 600 s and keeps polling
+- **WHEN** A releases after 300 s
+- **THEN** B's 600 s start then
+
 ### Requirement: Only changes need the lease
 
 A change to the link SHALL be refused unless it carries the holder's ticket, with a message

@@ -238,6 +238,20 @@ async function enter(who) {
 
 // -- the status, the counters and who uses the box -------------------------------------------
 
+// The band says what the box does to the line, whoever did it: calm with no link, the
+// wine red with one (U7).
+function bandText(applied, described) {
+  if (!applied) return "no link";
+  if (described && described.near) return `${described.near} <> ${described.far}`;
+  if (described && described.figures) return "set by figures";
+  return "link applied"; // applied without the API, e.g. with the CLI on the box
+}
+
+function showBand(applied, described) {
+  $("band-link").textContent = bandText(applied, described);
+  $("band").classList.toggle("live", !!applied);
+}
+
 async function refresh() {
   const res = await call("GET", "status");
   if (!res.ok) { say(errorOf(res), "bad"); return; }
@@ -249,6 +263,7 @@ async function refresh() {
   const applied = s.link.down.applied || s.link.up.applied;
   $("link-state").textContent = applied ? "impaired" : "no impairment";
   $("link-state").className = applied ? "warn" : "good";
+  showBand(applied, s.applied);
 
   lastHolder = b.holder;
   $("holder").textContent = b.holder
@@ -413,7 +428,7 @@ async function change(method, body, done) {
 
 $("apply").addEventListener("click", () => {
   const e = ends();
-  change("PUT", e, `Applied: ${e.near} to ${e.far}.`);
+  change("PUT", e, "Applied."); // the band says which link
 });
 
 $("clear").addEventListener("click", () => change("DELETE", undefined, "Cleared: no impairment."));

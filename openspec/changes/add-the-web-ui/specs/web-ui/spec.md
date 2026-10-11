@@ -49,6 +49,27 @@ person sign out and change the password.
 - **WHEN** the person presses Sign out in Settings
 - **THEN** the page asks to sign in, and a reload asks again
 
+### Requirement: The header says what the box is doing to the line
+
+The header band SHALL carry, under the logo and aligned to its left, the link the box applies
+now, read from the status whoever applied it, in the API's own short form: the two ends when
+it was applied from ends (`london:generic <> los-angeles:mobile-4g`), `set by figures` when from
+figures, `link applied` when the box applies one the API was not told about, and `no link` when
+nothing is applied. While nothing is applied the band
+SHALL be a calm pastel; only while a link is applied SHALL it take the primary wine red, so the
+state is seen from across the room. Every text on the band SHALL meet WCAG AA in both states
+and both themes.
+
+#### Scenario: An agent applies a link
+- **GIVEN** the page open, nothing applied, the band pastel
+- **WHEN** an agent applies London to Los Angeles, both on generic
+- **THEN** within a refresh the band is wine red and reads `london:generic <> los-angeles:generic`
+
+#### Scenario: Cleared
+- **GIVEN** a link applied and the band wine red
+- **WHEN** the holder clears it
+- **THEN** within a refresh the band is pastel and reads `no link`
+
 ### Requirement: The status line shows the box at a glance
 
 The page SHALL show the mode, whether a link is applied, the holder with its purpose and how
@@ -95,6 +116,27 @@ say why.
 - **GIVEN** the page holds the lease
 - **WHEN** the lease is ended by hand with the reason "bench needed"
 - **THEN** the page says its lease ended, with that reason, and offers to ask again
+
+### Requirement: The person chooses how long to hold the link
+
+The Lease section SHALL offer how long to hold the link: until released (chosen first), 10 min,
+30 min, 1 h, 5 h, 1 day, 1 week, or while this page is open. A lease with a length SHALL be kept
+when the page is closed, and a page opened again in the same browser SHALL find it held. The
+Broker page SHALL show, for the holder, the time remaining, "until released", or "while in use",
+and for each request its length.
+
+#### Scenario: An hour, then the page closed
+- **GIVEN** a free link
+- **WHEN** the person asks for it for 1 h, applies a link and closes the page
+- **THEN** the lease and the link are kept, and the Broker page shows about 1 h remaining
+
+#### Scenario: Until released
+- **WHEN** the person asks for the link until released
+- **THEN** the Broker page shows "until released" for the holder, and the page's Release ends it
+
+#### Scenario: While this page is open
+- **WHEN** the person asks for the link while the page is open, and closes the page
+- **THEN** the lease is released
 
 ### Requirement: The counters are shown
 

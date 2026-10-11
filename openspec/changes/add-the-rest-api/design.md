@@ -98,7 +98,31 @@ open
 until someone changes it is the router habit worth not copying); JWTs (a signed token is a second
 secret to manage, and a box with one process needs no stateless sessions).
 
+### R7. The status names the link applied (the owner, 2026-10-11)
+
+The engine knows figures, not the ends they came from, and the web page said what it had
+applied only in a passing message that other tabs never saw. The API now keeps the description
+of the last link it applied, the two ends with their channels resolved, or "from figures", and
+the status returns it as `applied`. It is dropped whenever the engine reports nothing applied,
+so a clear by hand, by the broker between holders, by the dead-man or by the boot all end it
+without the API being told. It is in memory: after a restart the boot has cleared the link.
+
+Not taken: the engine storing the description beside its qdiscs (the engine is about packets);
+inferring the ends back from the figures (several pairs give the same figures).
+
+### R8. `hold`: a lease for a length of time (the owner, 2026-10-11)
+
+`POST lease` takes the broker's `hold` (K7 of `add-the-broker`): seconds, from 60 to 604,800
+(a week), or `"until-released"`. A link is applied, and renewed on a poll, with the dead-man set
+to what the lease has left: the TTL for a lease that lives while used, the remaining time for a
+timed one, none for one until released. The MCP's `wanpire_lease` keeps the lease that lives
+while used: an agent that stops calling should lose the link.
+
 ## Risks / Trade-offs
+
+- **A link applied on the box with the CLI** bypasses the API, which then shows the previous
+  description if it never saw the link cleared in between. → The CLI on a served box is for
+  debugging; the page shows the figures it reads either way.
 
 - **One worker** is one process for the web UI, the API and the MCP. → They are idle between
   calls; the work is the kernel's.

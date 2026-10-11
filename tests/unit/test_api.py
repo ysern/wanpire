@@ -341,6 +341,43 @@ def test_clear(box):
     assert box.engine.calls[-1] == ("clear", "eth1")
 
 
+def applied(box):
+    return box.get("/api/v1/status", headers=AUTH).json()["applied"]
+
+
+def test_the_status_names_no_link_at_first(box):
+    assert applied(box) is None
+
+
+def test_the_status_names_the_ends_applied(box):
+    a = ask(box)
+    box.put("/api/v1/link", json={"near": "london", "far": "los-angeles:mobile-4g"},
+            headers=t(a["ticket"]))
+    assert applied(box) == {"near": "london:generic", "far": "los-angeles:mobile-4g"}
+
+
+def test_the_status_says_figures(box):
+    a = ask(box)
+    box.put("/api/v1/link", json={"down": {"delay_ms": 40}, "up": {"delay_ms": 40}},
+            headers=t(a["ticket"]))
+    assert applied(box) == {"figures": True}
+
+
+def test_the_status_forgets_the_link_once_cleared(box):
+    a = ask(box)
+    box.put("/api/v1/link", json={"near": "london", "far": "tokyo"}, headers=t(a["ticket"]))
+    box.delete("/api/v1/link", headers=t(a["ticket"]))
+    assert applied(box) is None
+
+
+def test_the_status_forgets_the_link_the_broker_cleared(box):
+    a = ask(box)
+    box.put("/api/v1/link", json={"near": "london", "far": "tokyo"}, headers=t(a["ticket"]))
+    box.request("DELETE", "/api/v1/lease/holder", json={"reason": "bench needed"}, headers=AUTH)
+    assert box.engine.applied is False
+    assert applied(box) is None
+
+
 def test_reading_the_link_needs_no_ticket(box):
     r = box.get("/api/v1/link", headers=AUTH)
     assert r.status_code == 200 and r.json()["down"]["applied"] is False
