@@ -157,7 +157,7 @@ def test_the_status_names_the_holder_and_the_queue(page):
     expect(page.locator("#queue")).to_contain_text("latency sweep")
 
 
-def test_the_counters_are_shown(page):
+def test_the_traffic_is_shown(page):
     page.box.engine.applied = True
     page.box.engine.packets = 1000
     sign_in(page)

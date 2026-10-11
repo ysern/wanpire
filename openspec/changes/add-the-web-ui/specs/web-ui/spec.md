@@ -138,9 +138,10 @@ and for each request its length.
 - **WHEN** the person asks for the link while the page is open, and closes the page
 - **THEN** the lease is released
 
-### Requirement: The counters are shown
+### Requirement: The traffic is shown
 
-The page SHALL show, each way, whether a link is applied and its counters: packets, bytes, the
+A page named Traffic (the counters' page until 2026-10-11; the API and the MCP keep the word
+"counters") SHALL show, each way, whether a link is applied and its counters: packets, bytes, the
 packets wanpire dropped, those the bandwidth's queue dropped, and those queued.
 
 #### Scenario: A link carrying traffic

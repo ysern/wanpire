@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 from .conftest import sign_in
 
 SECTIONS = ["link", "broker", "adapters", "endpoints", "settings"]  # the header's order (U9)
-PAGES = [("link", "link-set"), ("link", "link-counters"), ("broker", "broker-queue"),
+PAGES = [("link", "link-set"), ("link", "link-traffic"), ("broker", "broker-queue"),
          ("adapters", "adapters-list"), ("endpoints", "endpoints-places"),
          ("settings", "settings-access")]
 
@@ -83,8 +83,10 @@ def test_the_header_band_carries_the_sections(page):
 def test_the_side_menu_marks_the_current_page(page):
     sign_in(page)
     expect(page.locator("#sub-link-set")).to_have_attribute("aria-current", "page")
-    go(page, "link", "link-counters")
-    expect(page.locator("#sub-link-counters")).to_have_attribute("aria-current", "page")
+    go(page, "link", "link-traffic")
+    expect(page.locator("#sub-link-traffic")).to_have_attribute("aria-current", "page")
+    expect(page.locator("#sub-link-traffic")).to_have_text("Traffic")
+    expect(page.locator("#page-link-traffic h2")).to_have_text("Traffic")
     expect(page.locator("#sub-link-set")).not_to_have_attribute("aria-current", "page")
     expect(page.locator("#c-down-packets")).to_be_visible()
     expect(page.locator("#near-endpoint")).to_be_hidden()
