@@ -91,6 +91,34 @@ sudo .venv/bin/wanpire up           # set up the configured mode
 sudo .venv/bin/wanpire down         # and take it off again
 ```
 
+### A Wi-Fi device under test
+
+A Wi-Fi adapter picked as inbound or outbound becomes an access point that the device joins
+(`hostapd`, 5 GHz channel 36, WPA2 and WPA3), in either mode. Pick it on the web page's
+Adapters / Roles page, with the network's name and password, or in the configuration:
+
+```json
+{"schema": "wanpire-config/1", "mode": "bridge",
+ "adapters": {"control": "wlan0", "inbound": "eth0", "outbound": ["wlan1"]},
+ "access_points": {"wlan1": {"ssid": "<wifi-ssid>", "passphrase": "<wifi-password>"}},
+ "wifi": {"country": "<two-letter country code>"}}
+```
+
+The box's own Wi-Fi stays its control channel and is never offered. A USB adapter whose kernel
+has no driver for it is named by the install; `install.sh --wifi-driver` builds the out-of-tree
+[rtw89 backport](https://github.com/morrownr/rtw89) for Realtek's Wi-Fi 6 USB chips through DKMS
+(one compiler at a time on a small box: a 1 GB Pi building with three stops answering).
+wanpire ships none of that driver.
+
+Adapters tried as access points on the reference build:
+
+| Adapter | Chip | Driver | Access point |
+|---|---|---|---|
+| TP-Link Archer TX20U Plus (USB `2357:013f`) | RTL8832AU | rtw89 backport, DKMS | being tried |
+
+Adapters whose driver is in the kernel and known to do AP mode, if you are buying one: MediaTek
+MT7612U and MT7921AU based ones (`mt76`).
+
 The REST API (`wanpire serve`, on the control adapter's address, port 8080) needs the box's
 account: HTTP Basic credentials on every call (`curl -u admin:<password> ...`), or a browser's
 session after it signs in. One client drives the link at a time:

@@ -31,15 +31,38 @@ def fake_sysfs(base: Path, ifaces: dict[str, str]) -> Path:
         d.mkdir()
         if kind == "virtual":
             continue
-        dev = base / "devices" / ("usb2/2-1/2-1:1.0" if kind == "usb" else f"platform/{name}")
+        usb = kind in ("usb", "usb-wifi")
+        dev = base / "devices" / (f"usb2/2-1/2-1:1.0/{name}" if usb else f"platform/{name}")
         dev.mkdir(parents=True)
         (d / "device").symlink_to(dev)
-        if kind == "wifi":
+        if kind in ("wifi", "usb-wifi"):
             (d / "wireless").mkdir()
     return net
 
 
 PI = {"lo": "virtual", "wlan0": "wifi", "eth0": "onboard", "eth1": "usb"}
+
+
+def fake_usb(base: Path, devices: dict[str, tuple[str, str, str, bool]]) -> Path:
+    """A /sys/bus/usb/devices: name -> (vendor id, product id, product, driven)."""
+    usb = base / "usb-devices"
+    usb.mkdir(parents=True)
+    for name, (vendor, product_id, product, driven) in devices.items():
+        d = usb / name
+        (d / f"{name}:1.0").mkdir(parents=True)
+        (d / "idVendor").write_text(vendor + "
+")
+        (d / "idProduct").write_text(product_id + "
+")
+        (d / "product").write_text(product + "
+")
+        if driven:
+            (d / f"{name}:1.0" / "driver").symlink_to(base)
+    return usb
+
+
+NO_DRIVER = {"1-1.4": ("2357", "013f", "802.11ac WLAN Adapter", False),
+             "2-1": ("0b95", "1790", "AX88179B", True)}
 
 
 @pytest.fixture
@@ -48,9 +71,11 @@ def box(tmp_path):
     root.mkdir()
     sysfs = fake_sysfs(tmp_path, PI)
 
-    def run(*args, sysfs_dir=sysfs, check=True, stdin=""):
+    usb = fake_usb(tmp_path, {})
+
+    def run(*args, sysfs_dir=sysfs, usb_dir=usb, check=True, stdin=""):
         r = subprocess.run(["sh", str(SCRIPT), *args, "--root", str(root), "--no-venv",
-                            "--sysfs", str(sysfs_dir)],
+                            "--sysfs", str(sysfs_dir), "--usb-sysfs", str(usb_dir)],
                            capture_output=True, text=True, timeout=60, input=stdin,
                            env={**os.environ, "PYTHON": sys.executable})
         if check:
@@ -256,4 +281,71 @@ def test_no_check_needs_every_role(box):
     r = box("--outbound", "eth7", "--no-check", check=False)
     assert r.returncode != 0
     assert "--control" in r.stderr
+    assert files(box.root) == {}
+
+
+# -- Wi-Fi: the access point's driver and country (host-a-wifi-access-point) -----------------
+
+def test_a_new_configuration_is_readable_by_root_only(box):
+    box(*ROLES)
+    assert mode(box.root / "etc/wanpire/wanpire.json") == 0o600
+
+
+def test_a_second_install_keeps_what_the_page_saved(box):
+    box(*ROLES)
+    cfg = box.root / "etc/wanpire/wanpire.json"
+    saved = json.loads(cfg.read_text())
+    saved["adapters"]["outbound"] = ["eth1"]
+    saved["access_points"] = {"wlan1": {"ssid": "lab-ap", "passphrase": "correct horse"}}
+    saved["wifi"] = {"country": "GB"}
+    cfg.write_text(json.dumps(saved))
+    box(*ROLES)
+    assert json.loads(cfg.read_text()) == saved
+
+
+def test_the_country_from_the_option(box):
+    box(*ROLES, "--wifi-country", "GB")
+    cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
+    assert cfg["wifi"] == {"country": "GB"}
+
+
+def test_the_country_added_to_an_installed_box(box):
+    box(*ROLES)
+    box(*ROLES, "--wifi-country", "US")
+    cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
+    assert cfg["wifi"] == {"country": "US"} and cfg["adapters"]["outbound"] == ["eth1"]
+
+
+def test_a_country_that_is_not_one_is_refused(box):
+    r = box(*ROLES, "--wifi-country", "gb", check=False)
+    assert r.returncode != 0 and "--wifi-country" in r.stderr
+    assert files(box.root) == {}
+
+
+def test_a_usb_wifi_adapter_is_not_taken_for_control(box):
+    sysfs = fake_sysfs(box.tmp / "two-radios", {"lo": "virtual", "wlan0": "usb-wifi",
+                                                "wlan1": "wifi", "eth0": "onboard",
+                                                "eth1": "usb"})
+    box(sysfs_dir=sysfs)
+    cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
+    assert cfg["adapters"]["control"] == "wlan1"
+
+
+def test_an_adapter_with_no_driver_is_named_and_none_installed(box):
+    usb = fake_usb(box.tmp / "b", NO_DRIVER)
+    r = box(*ROLES, usb_dir=usb)
+    line = [x for x in r.stdout.splitlines() if "2357:013f" in x]
+    assert line and "no driver" in line[0] and "--wifi-driver" in line[0]
+    assert "0b95:1790" not in r.stdout
+    assert "dkms" not in r.stdout
+
+
+def test_the_driver_step_in_a_dry_run(box):
+    usb = fake_usb(box.tmp / "b", NO_DRIVER)
+    r = box(*ROLES, "--wifi-driver", "--dry-run", usb_dir=usb)
+    out = r.stdout
+    for want in ("linux-headers-", "dkms", "git", "github.com/morrownr/rtw89", "dkms install",
+                 "/etc/dkms/rtw89.conf",
+                 "install_fw", "/etc/modprobe.d/"):
+        assert want in out, want
     assert files(box.root) == {}

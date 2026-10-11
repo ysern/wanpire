@@ -1,7 +1,7 @@
 ## 1. Spike: the USB adapter as an access point (on the box)
 
-- [ ] 1.1 Find the chip from the USB id tables of the candidate drivers; check the driver's licence
-- [ ] 1.2 Install the kernel headers, `dkms`, `hostapd`; build and install the driver by DKMS; the adapter gets a network interface, its radio lists AP mode
+- [x] 1.1 Find the chip from the USB id tables of the candidate drivers; check the driver's licence
+- [ ] 1.2 Install the kernel headers, `dkms`, `hostapd`; build and install the driver by DKMS; the adapter gets a network interface, its radio lists AP mode (blocked: the build starved the box, owner to power-cycle it; open questions O6)
 - [ ] 1.3 A test access point on the USB adapter only (5 GHz, WPA2/WPA3, a generated name and password): up, its channel and width, its beacon seen from the box's other radio
 - [ ] 1.4 Station-less stability: the access point left up for an hour or more, checked every minute (hostapd alive, interface up, kernel log clean)
 - [ ] 1.5 Record what needs a Wi-Fi client (association, WPA3, throughput, added delay and loss against the line) as questions for the owner
@@ -30,6 +30,6 @@
 ## 6. Install and close
 
 - [ ] 6.1 Failing tests: `--wifi-driver --dry-run` prints the steps, the country from `--wifi-country`, an unrecognised adapter named
-- [ ] 6.2 Implement in `install.sh` until green
+- [ ] 6.2 Implement in `install.sh` until green (written; its tests run on Linux only and wait for the box)
 - [ ] 6.3 On the box: the roles saved from the page with the USB adapter as outbound in bridge mode, the access point up, then put back as it was
 - [ ] 6.4 README (the adapters known to work), journal, open questions

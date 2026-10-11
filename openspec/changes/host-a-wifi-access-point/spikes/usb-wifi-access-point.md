@@ -1,6 +1,7 @@
 # Spike: the USB Wi-Fi adapter as an access point
 
-**Status:** in progress, 2026-10-11.
+**Status:** blocked, 2026-10-11: the box stopped answering while it built the driver, and waits
+for the owner to power-cycle it (`docs/open-questions.md`, O6). Neither passed nor failed.
 
 ## Question
 
@@ -39,7 +40,14 @@ recommends a MediaTek MT7612U or MT7921AU adapter (in-kernel `mt76`, AP mode pro
 
 ## Findings
 
-(Written when the spike ends.)
+- The TX20U Plus (`2357:013f`) is an **RTL8832AU**. Its driver is the `rtw89` backport
+  (morrownr/rtw89, Dual BSD/GPL, DKMS, kernels 6.6 and newer), not the `rtl8852bu` first guessed.
+- **Building it with the backport's default of three compilers starves a 1 GB Pi**: SSH stopped
+  answering within two minutes and had not come back 100 minutes later (ping still answered).
+  The install builds with one compiler on a small box, also for DKMS's rebuild after a kernel
+  update (`/etc/dkms/rtw89.conf`).
+- Not yet known: whether the module builds and loads, AP mode, the access point's stability, and
+  anything a client must measure (O6, O7).
 
 ## Findings in full
 
@@ -59,3 +67,21 @@ it into wanpire is not, and wanpire does not.
 
 The adapter enumerates on the Pi as a USB 2.0 device (480 Mbit/s, vendor-specific class, 500 mA),
 after its own switch out of its driver-disc mode.
+
+### Building the driver on a 1 GB Pi starves it
+
+The kernel headers, `dkms`, `git`, `build-essential` and `hostapd` installed cleanly (Ubuntu's
+`hostapd` 2.10 comes masked, so it starts nothing by itself). The backport, version 7.3 at commit
+`8bbbaca` (2026-10-05), was cloned into `/usr/src/rtw89-7.3` and `dkms install rtw89/7.3` started.
+
+Within two minutes the box stopped answering SSH: the TCP connection opened, the SSH banner never
+came, and it kept answering ping. The backport's Makefile runs `nproc - 1` compilers, three on a
+Pi 4, and the rtw89 sources (large register tables) need more memory per compiler than a 1 GB
+box with no swap has for three. The kernel does not kill anything; it keeps evicting and
+re-reading pages, and nothing in user space gets to run. This is the box's control channel lost
+by a build, not by a network change.
+
+Consequences for the change: the install's driver step runs the build with one compiler on a box
+with less than 3 GB (`NPROC=1`, which the Makefile takes from the environment), and says so. A
+temporary swap file during the build is the other remedy (not taken: it writes a gigabyte to the
+SD card).

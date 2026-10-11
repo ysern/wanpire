@@ -777,3 +777,31 @@ ending it by hand, or a reboot clears it. The Broker page shows what is left.
 
 Smaller things the owner asked for: Endpoints moved next to Settings, each place now opens to
 its channels and their figures, and Counters is called Traffic.
+
+## 2026-10-11 — A hotspot of its own
+
+A headset joins Wi-Fi, not a cable. So far that meant an access point behind wanpire, one more
+box on the bench and one more hop wanpire did not control. The owner plugged a USB Wi-Fi adapter
+into the Pi and asked for wanpire to be the access point itself.
+
+The adapter was the first surprise. It was sold as a Wi-Fi 6 stick and assumed to be the chip
+most of those use, with a well-known out-of-tree driver. That driver's list of USB ids did not
+have it. Upstream Linux's did, in another file: the chip is an RTL8832AU, which the kernel drives
+only from versions well after the Pi's 6.8. A backport of that upstream driver builds for older
+kernels through DKMS, and lists it. wanpire references it and ships none of it: it is GPL code,
+and it is someone else's to keep up to date.
+
+The second surprise was the build. The driver's Makefile runs one compiler per core but one, and
+three compilers on a 1 GB Pi with no swap left nothing for anything else. The box kept answering
+ping and opened TCP connections, but SSH never said hello. Nothing was killed; the kernel just
+kept evicting pages and reading them back. The install's driver step now builds with one
+compiler on a small box.
+
+The page got what the owner sketched: the Adapters page has two drop-downs, inbound and outbound,
+and picking a Wi-Fi adapter in either shows the network name and password below it. Save checks
+them by the usual Wi-Fi rules (a name of 1 to 32 bytes, a password of 8 to 63 printable
+characters) and refuses one adapter in both roles. The box then takes the line down and sets it
+up again with the new roles, without a restart, so nobody is signed out; it refuses while
+someone holds the link, and puts the old roles back if the new ones do not come up. The access
+point is `hostapd`, on 5 GHz channel 36, WPA2 and WPA3 both accepted. The network name goes to
+`hostapd` in hexadecimal, so a quote or a line break in it cannot become a setting of its own.
