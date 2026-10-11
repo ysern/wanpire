@@ -53,20 +53,135 @@ def test_a_missing_adapter_is_named_with_the_ones_the_box_has():
         config_from_dict(doc(outbound=("eth9",)), BOX)
 
 
-def test_wifi_as_a_bridge_port_is_refused():
-    with pytest.raises(InvalidConfig, match="Wi-Fi client cannot be a bridge port"):
-        config_from_dict(doc(inbound="wlan0", control="eth1", outbound=("eth0",)), BOX)
-
-
 def test_control_on_a_bridge_port_is_refused():
     with pytest.raises(InvalidConfig, match="control cannot be a bridge port"):
         config_from_dict(doc(control="eth0"), BOX)
 
 
-def test_wifi_outbound_is_not_built_yet():
-    with pytest.raises(InvalidConfig, match="access point.*not built"):
-        config_from_dict(doc(mode="router", control="eth0", inbound="eth0",
-                             outbound=("wlan0",)), BOX)
+# -- Wi-Fi adapters in a role are access points (host-a-wifi-access-point) -------------------
+
+AP_BOX = dict(BOX, wlan1=adapter("wlan1", "wifi"),
+              wlan2=Adapter(name="wlan2", kind="wifi", mac="00:00:00:00:00:00", state="down",
+                            speed_mbit=None, can_be_ap=False))
+AP = {"ssid": "lab-ap", "passphrase": "correct horse"}
+WIFI = {"country": "GB"}
+
+
+def ap_doc(mode="bridge", inbound="eth0", outbound=("wlan1",), aps=None, wifi=WIFI, **over):
+    d = doc(mode=mode, inbound=inbound, outbound=outbound, **over)
+    d["access_points"] = {"wlan1": AP} if aps is None else aps
+    if wifi is not None:
+        d["wifi"] = wifi
+    return d
+
+
+def test_a_wifi_access_point_as_a_bridge_port():
+    c = config_from_dict(ap_doc(), AP_BOX)
+    assert c.outbound == ("wlan1",) and c.country == "GB"
+    assert c.access_point("wlan1") == AP and c.access_point("eth0") is None
+    assert c.access_point_adapters == ("wlan1",)
+
+
+def test_a_wifi_access_point_as_outbound_in_router_mode():
+    c = config_from_dict(ap_doc(mode="router"), AP_BOX)
+    assert c.access_point_adapters == ("wlan1",)
+
+
+def test_a_wifi_inbound_access_point_in_bridge_mode():
+    c = config_from_dict(ap_doc(inbound="wlan1", outbound=("eth1",)), AP_BOX)
+    assert c.access_point_adapters == ("wlan1",)
+
+
+def test_a_radio_that_cannot_be_an_access_point_is_refused():
+    with pytest.raises(InvalidConfig, match="wlan2 cannot be an access point"):
+        config_from_dict(ap_doc(outbound=("wlan2",), aps={"wlan2": AP}), AP_BOX)
+
+
+def test_wifi_inbound_in_router_mode_is_refused():
+    with pytest.raises(InvalidConfig, match="bridge mode only"):
+        config_from_dict(ap_doc(mode="router", inbound="wlan1", outbound=("eth1",)), AP_BOX)
+
+
+def test_a_wifi_outbound_without_its_network_is_refused():
+    with pytest.raises(InvalidConfig, match="wlan1 needs a network name and a password"):
+        config_from_dict(ap_doc(aps={}), AP_BOX)
+
+
+def test_a_wifi_bridge_port_without_its_network_is_refused():
+    with pytest.raises(InvalidConfig, match="wlan0 needs a network name and a password"):
+        config_from_dict(doc(inbound="wlan0", control="eth1", outbound=("eth0",)), BOX)
+
+
+@pytest.mark.parametrize("passphrase", ["seven77", "x" * 64, "tab\there!", "café-latte"])
+def test_a_password_outside_the_rules_is_refused(passphrase):
+    with pytest.raises(InvalidConfig, match="8 to 63 printable ASCII"):
+        config_from_dict(ap_doc(aps={"wlan1": {"ssid": "lab", "passphrase": passphrase}}),
+                         AP_BOX)
+
+
+@pytest.mark.parametrize("passphrase", ["eight888", "x" * 63, "with spaces ~!"])
+def test_a_password_inside_the_rules(passphrase):
+    c = config_from_dict(ap_doc(aps={"wlan1": {"ssid": "lab", "passphrase": passphrase}}),
+                         AP_BOX)
+    assert c.access_point("wlan1")["passphrase"] == passphrase
+
+
+@pytest.mark.parametrize("ssid", ["", "x" * 33, "é" * 17, 7])
+def test_a_name_outside_the_rules_is_refused(ssid):
+    with pytest.raises(InvalidConfig, match="1 to 32 bytes"):
+        config_from_dict(ap_doc(aps={"wlan1": {"ssid": ssid, "passphrase": "eight888"}}),
+                         AP_BOX)
+
+
+def test_a_name_of_32_bytes_in_utf8_is_accepted():
+    ssid = "é" * 16
+    c = config_from_dict(ap_doc(aps={"wlan1": {"ssid": ssid, "passphrase": "eight888"}}),
+                         AP_BOX)
+    assert c.access_point("wlan1")["ssid"] == ssid
+
+
+@pytest.mark.parametrize("wifi", [None, {}, {"country": "00"}, {"country": "gb"},
+                                  {"country": "GBR"}])
+def test_an_access_point_needs_the_country(wifi):
+    with pytest.raises(InvalidConfig, match="regulatory country"):
+        config_from_dict(ap_doc(wifi=wifi), AP_BOX)
+
+
+def test_the_control_adapter_is_never_an_access_point():
+    with pytest.raises(InvalidConfig, match="control"):
+        config_from_dict(ap_doc(mode="router", control="wlan1", inbound="eth0",
+                                outbound=("eth1",)), AP_BOX)
+
+
+def test_a_wired_configuration_needs_no_wifi_settings():
+    c = config_from_dict(doc(), AP_BOX)
+    assert c.access_point_adapters == () and c.country is None
+
+
+def test_settings_for_an_adapter_in_no_role_are_kept_but_unused():
+    c = config_from_dict(doc(access_points={"wlan1": AP}), AP_BOX)
+    assert c.access_point_adapters == ()
+    assert c.to_dict()["access_points"] == {"wlan1": AP}
+
+
+def test_the_roles_are_written_back(tmp_path):
+    from wanpire.config import load_config, save_config
+    path = tmp_path / "wanpire.json"
+    c = config_from_dict(doc(mode="router", router={"address": "10.5.0.1/24"}), AP_BOX)
+    c2 = config_from_dict(dict(c.to_dict(), adapters={"control": "wlan0", "inbound": "eth0",
+                                                      "outbound": ["wlan1"]},
+                               access_points={"wlan1": AP}, wifi=WIFI), AP_BOX)
+    save_config(c2, str(path))
+    back = load_config(str(path), AP_BOX)
+    assert (back.mode, back.control, back.inbound, back.outbound) == (
+        "router", "wlan0", "eth0", ("wlan1",))
+    assert back.router_address == "10.5.0.1/24" and back.access_point("wlan1") == AP
+    assert back.country == "GB"
+    import os
+    import stat
+    if os.name == "posix":
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    assert not [p for p in tmp_path.iterdir() if p.name != "wanpire.json"]
 
 
 def test_an_unknown_mode():

@@ -22,6 +22,7 @@ import os
 import signal
 import time
 
+from .access_point import AccessPoint, AccessPointFailed
 from .config import Config
 from .engine import CommandFailed, run
 
@@ -42,23 +43,33 @@ def _attr(msg, name):
 
 class Modes:
     def __init__(self, netns: str | None = None, state_dir: str = DEFAULT_STATE_DIR,
-                 runner=None):
+                 runner=None, access_point=None):
         self.netns = netns
         self.state_dir = state_dir
         self._run = runner or (lambda argv, check=True: run(argv, check=check, netns=netns))
+        self._ap = access_point or AccessPoint(state_dir=state_dir, runner=self._run)
 
     # -- public ---------------------------------------------------------------------------
 
     def up(self, cfg: Config) -> None:
-        if cfg.mode == "bridge":
-            self._bridge_up(cfg)
-        else:
-            self._router_up(cfg)
+        try:
+            if cfg.mode == "bridge":
+                self._bridge_up(cfg)
+            else:
+                self._router_up(cfg)
+        except AccessPointFailed as e:
+            raise ModeRefused(str(e)) from None
 
     def down(self, cfg: Config) -> None:
         """Remove whatever either mode may have set up for these adapters."""
+        for name in (cfg.inbound, *cfg.outbound):  # only the line's adapters, never control
+            self._ap.stop(name)
         self._bridge_down(cfg)
         self._router_down(cfg)
+
+    def _start_access_points(self, cfg: Config, bridge: str | None) -> None:
+        for name in cfg.access_point_adapters:
+            self._ap.start(name, cfg.access_point(name), cfg.country, bridge=bridge)
 
     # -- pyroute2 ---------------------------------------------------------------------------
 
@@ -109,9 +120,12 @@ class Modes:
             # address, and a global one from any router advertisement on the line.
             self._run(["sysctl", "-qw", f"net.ipv6.conf.{cfg.bridge_name}.disable_ipv6=1"])
             for name, _ in ports:
+                if name in cfg.access_point_adapters:
+                    continue  # hostapd puts an access point in the bridge itself
                 ipr.link("set", index=idx[name], master=br)
                 ipr.link("set", index=idx[name], state="up")
             ipr.link("set", index=br, state="up")
+        self._start_access_points(cfg, bridge=cfg.bridge_name)
 
     def _bridge_down(self, cfg: Config) -> None:
         with self._ipr() as ipr:
@@ -129,6 +143,9 @@ class Modes:
         iface = ipaddress.ip_interface(cfg.router_address)
         with self._ipr() as ipr:
             self._require(ipr, cfg.inbound, "inbound")
+            self._require(ipr, out, "outbound")
+        self._start_access_points(cfg, bridge=None)  # first: hostapd makes it an AP interface
+        with self._ipr() as ipr:
             idx = self._require(ipr, out, "outbound")
             have = self._addresses(ipr, idx)
             if str(iface) not in have:

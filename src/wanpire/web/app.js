@@ -138,6 +138,100 @@ async function loadAdapters() {
     a.name, a.kind, a.role || "none", a.state || "-", a.speed_mbit ? `${a.speed_mbit} Mbit/s` : "-"]));
 }
 
+// -- the roles: inbound and outbound, an access point beside a Wi-Fi one ---------------------
+
+const ROLES = ["inbound", "outbound"];
+let offered = []; // the adapters the box lets be picked, with their kind
+let accessPoints = {}; // the access points the box has, by adapter
+
+const isWifi = (name) => (offered.find((a) => a.name === name) || {}).kind === "wifi";
+
+// The general Wi-Fi rules, the same as the box's: it is the authority, this only says it sooner.
+function ssidProblem(ssid) {
+  const bytes = new TextEncoder().encode(ssid).length;
+  return bytes >= 1 && bytes <= 32 ? "" : "A network name has 1 to 32 bytes.";
+}
+
+function passProblem(pass) {
+  return /^[\x20-\x7e]{8,63}$/.test(pass) ? ""
+    : "A password has 8 to 63 printable ASCII characters.";
+}
+
+function showAccessPoint(role) {
+  const name = $(`role-${role}`).value;
+  const wifi = isWifi(name);
+  $(`ap-${role}`).hidden = !wifi;
+  if (wifi) {
+    const ap = accessPoints[name] || { ssid: "", passphrase: "" };
+    $(`ap-${role}-ssid`).value = ap.ssid;
+    $(`ap-${role}-pass`).value = ap.passphrase;
+  }
+  $(`ap-${role}-ssid-error`).textContent = "";
+  $(`ap-${role}-pass-error`).textContent = "";
+}
+
+async function loadRoles() {
+  const res = await call("GET", "roles");
+  if (!res.ok) return;
+  offered = res.data.offered;
+  accessPoints = res.data.access_points || {};
+  for (const role of ROLES) {
+    const sel = $(`role-${role}`);
+    sel.replaceChildren(...offered.map((a) => option(a.name, `${a.name} (${a.kind})`)));
+    sel.value = res.data[role];
+    showAccessPoint(role);
+  }
+}
+
+for (const role of ROLES) {
+  $(`role-${role}`).addEventListener("change", () => {
+    $("role-error").textContent = "";
+    showAccessPoint(role);
+  });
+}
+
+$("roles-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const m = $("roles-message");
+  m.textContent = "";
+  m.className = "help";
+  const body = { inbound: $("role-inbound").value, outbound: $("role-outbound").value,
+    access_points: {} };
+  let wrong = false;
+  $("role-error").textContent = "";
+  if (body.inbound === body.outbound) {
+    $("role-error").textContent = "Inbound and outbound must differ: pick two adapters.";
+    wrong = true;
+  }
+  for (const role of ROLES) {
+    const name = body[role];
+    if (!isWifi(name)) continue;
+    const ssid = $(`ap-${role}-ssid`).value;
+    const passphrase = $(`ap-${role}-pass`).value;
+    $(`ap-${role}-ssid-error`).textContent = ssidProblem(ssid);
+    $(`ap-${role}-pass-error`).textContent = passProblem(passphrase);
+    if (ssidProblem(ssid) || passProblem(passphrase)) wrong = true;
+    body.access_points[name] = { ssid, passphrase };
+  }
+  if (wrong) return;
+  $("roles-save").disabled = true;
+  m.textContent = "Saving: the line is set up again…";
+  try {
+    const res = await call("PUT", "roles", body);
+    if (res.ok) {
+      m.textContent = "The roles are saved and the line is set up with them.";
+      m.className = "help good";
+      await loadRoles();
+      await loadAdapters();
+    } else {
+      m.textContent = errorOf(res);
+      m.className = "help bad";
+    }
+  } finally {
+    $("roles-save").disabled = false;
+  }
+});
+
 // -- the first visit, signing in and out ------------------------------------------------------
 
 const MIN_PASSWORD = 8;
@@ -234,6 +328,7 @@ async function enter(who) {
     await refresh();
     await loadEndpoints();
     await loadAdapters();
+    await loadRoles();
   } catch (e) {
     if (!(e instanceof Refused)) say(`Cannot reach the box: ${e.message}`, "bad");
     return;

@@ -59,12 +59,16 @@ def _serve(a) -> int:
     from .broker import Broker
     adapters = None if a.netns else {x.name: x for x in list_adapters()}
     cfg = load_config(a.config, adapters)
-    outbound = cfg.outbound[0]
+    from .roles import Roles
+    # the roles may change while the server runs (PUT /api/v1/roles), so nothing below keeps
+    # its own copy of the outbound adapter; in a test bed (--netns) they are read only
+    roles = Roles(cfg, list_adapters, modes=None if a.netns else make_modes(),
+                  path=None if a.netns else a.config)
     engine = make_engine(netns=a.netns, control=[cfg.control])
-    broker = Broker(on_clear=lambda: engine.clear(outbound))
+    broker = Broker(on_clear=lambda: engine.clear(roles.config.outbound[0]))
     account = Account(a.account_file)
     app = create_app(engine=engine, broker=broker, config=cfg, account=account,
-                     list_adapters=list_adapters)
+                     list_adapters=list_adapters, roles=roles)
     host = a.host or control_address(cfg.control)
     if not account.exists():
         print(f"wanpire: no account yet: open the web page, http://{host}:{a.port}/, to make "

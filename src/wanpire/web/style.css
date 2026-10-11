@@ -253,6 +253,10 @@ footer { color: var(--muted); font-size: 13px; padding: 8px 0 32px; }
 .pair { display: flex; gap: 8px; }
 .pair select { flex: 1; min-width: 0; }
 .help { color: var(--muted); font-size: 13px; margin: 4px 0 0; overflow-wrap: anywhere; }
+/* an access point's fields sit in the form's grid as if they were its own rows */
+.ap-fields { display: contents; }
+.ap-fields > label { padding-top: 6px; }
+.help.bad:empty { display: none; }
 
 input, select {
   font: inherit;

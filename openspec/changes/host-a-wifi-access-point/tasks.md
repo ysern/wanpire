@@ -9,23 +9,23 @@
 
 ## 2. Configuration (no root)
 
-- [ ] 2.1 Failing tests: each scenario of `adapter-roles` (Wi-Fi as an access point, radio without AP mode, Wi-Fi inbound in router mode, name and password rules, country, the wired configuration as before, writing it back)
-- [ ] 2.2 Implement in `config.py` until green
+- [x] 2.1 Failing tests: each scenario of `adapter-roles` (Wi-Fi as an access point, radio without AP mode, Wi-Fi inbound in router mode, name and password rules, country, the wired configuration as before, writing it back)
+- [x] 2.2 Implement in `config.py` until green
 
 ## 3. The access point (no root)
 
-- [ ] 3.1 Failing tests: the `hostapd` settings for bridge and router mode, the name in hexadecimal, the file's mode; start and stop with a fake runner, twice; hostapd's reason on failure; no command names the control adapter
-- [ ] 3.2 Implement `access_point.py` and its place in `modes.py` until green
+- [x] 3.1 Failing tests: the `hostapd` settings for bridge and router mode, the name in hexadecimal, the file's mode; start and stop with a fake runner, twice; hostapd's reason on failure; no command names the control adapter
+- [x] 3.2 Implement `access_point.py` and its place in `modes.py` until green
 
 ## 4. REST API
 
-- [ ] 4.1 Failing tests: `GET /api/v1/roles` (the offered adapters), `PUT` refusing one adapter twice, bad Wi-Fi settings, 409 under a link or a lease, a saved change setting the mode up again, a failed set-up put back
-- [ ] 4.2 Implement in `api.py` (a configuration that can change while the server runs) until green
+- [x] 4.1 Failing tests: `GET /api/v1/roles` (the offered adapters), `PUT` refusing one adapter twice, bad Wi-Fi settings, 409 under a link or a lease, a saved change setting the mode up again, a failed set-up put back
+- [x] 4.2 Implement in `api.py` (a configuration that can change while the server runs) until green
 
 ## 5. The page
 
-- [ ] 5.1 Failing browser tests: the two drop-downs, the Wi-Fi fields shown and hidden, the same adapter twice, a short password, saved
-- [ ] 5.2 Implement in `index.html` and `app.js` until green; width and contrast tests still green
+- [x] 5.1 Failing browser tests: the two drop-downs, the Wi-Fi fields shown and hidden, the same adapter twice, a short password, saved
+- [x] 5.2 Implement in `index.html` and `app.js` until green; width and contrast tests still green
 
 ## 6. Install and close
 

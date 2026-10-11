@@ -24,6 +24,7 @@ from wanpire.adapters import Adapter  # noqa: E402
 from wanpire.api import create_app  # noqa: E402
 from wanpire.broker import Broker  # noqa: E402
 from wanpire.config import config_from_dict  # noqa: E402
+from wanpire.roles import Roles  # noqa: E402
 
 USER, PASSWORD = "admin", "correct horse"
 AUTH = {"Authorization": "Basic " + base64.b64encode(f"{USER}:{PASSWORD}".encode()).decode()}
@@ -31,10 +32,24 @@ LEASE_TTL_S = 3.0  # the page polls at a third of it: once a second
 
 ADAPTERS = [Adapter("eth0", "ethernet", "aa:bb:cc:dd:ee:01", "up", 1000, False),
             Adapter("eth1", "usb-ethernet", "aa:bb:cc:dd:ee:02", "up", 1000, False),
-            Adapter("wlan0", "wifi", "aa:bb:cc:dd:ee:03", "up", None, True)]
+            Adapter("wlan0", "wifi", "aa:bb:cc:dd:ee:03", "up", None, True),
+            Adapter("wlan1", "wifi", "aa:bb:cc:dd:ee:04", "down", None, True),
+            Adapter("wpbr0", "virtual", "aa:bb:cc:dd:ee:05", "up", None, False)]
 CONFIG = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
                            "adapters": {"control": "wlan0", "inbound": "eth0",
-                                        "outbound": ["eth1"]}})
+                                        "outbound": ["eth1"]},
+                           "wifi": {"country": "GB"}})
+
+
+class RecordingModes:
+    def __init__(self):
+        self.calls = []
+
+    def up(self, cfg):
+        self.calls.append(("up", cfg.inbound, cfg.outbound[0]))
+
+    def down(self, cfg):
+        self.calls.append(("down", cfg.inbound, cfg.outbound[0]))
 
 
 class RecordingEngine:
@@ -66,14 +81,17 @@ class RecordingEngine:
 class Box:
     def __init__(self, with_account=True):
         self.engine = RecordingEngine()
-        self.broker = Broker(on_clear=lambda: self.engine.clear("eth1"),
+        self.modes = RecordingModes()
+        self.config_path = Path(tempfile.mkdtemp()) / "wanpire.json"
+        self.roles = Roles(CONFIG, lambda: ADAPTERS, modes=self.modes, path=str(self.config_path))
+        self.broker = Broker(on_clear=lambda: self.engine.clear(self.roles.config.outbound[0]),
                              lease_ttl_s=LEASE_TTL_S, queue_ttl_s=LEASE_TTL_S)
         self.account = Account(Path(tempfile.mkdtemp()) / "account")
         if with_account:
             self.account.set(USER, PASSWORD)
         app = create_app(engine=self.engine, broker=self.broker, config=CONFIG,
                          account=self.account, list_adapters=lambda: ADAPTERS, tick_s=None,
-                         fail_delay_s=0)
+                         fail_delay_s=0, roles=self.roles)
         with socket.socket() as s:
             s.bind(("127.0.0.1", 0))
             self.port = s.getsockname()[1]

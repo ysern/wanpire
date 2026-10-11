@@ -23,6 +23,8 @@ broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ti
     GET    /api/v1/endpoints/{id}    one preset document
     POST   /api/v1/preview           {"near", "far"} -> the link and how it was worked out
     GET    /api/v1/adapters          every adapter, its facts and its role
+    GET    /api/v1/roles             inbound, outbound, their access points, what may be picked
+    PUT    /api/v1/roles             {"inbound", "outbound", "access_points"}: set them (idle line)
     POST   /mcp                      the MCP (streamable HTTP), its tools calling the routes above
 
 The web UI's static files are served at ``/`` without credentials: they hold no data, and the
@@ -50,8 +52,10 @@ from .account import Account, InvalidAccount, check
 from .broker import Broker, InvalidHold, LeaseEnded, NotHolder, UnknownTicket
 from .config import Config, InvalidConfig
 from .engine import CommandFailed, RefusedAdapter
+from .modes import ModeRefused
 from .model import InvalidLink, Link
 from .presets import InvalidPreset
+from .roles import Roles
 
 TICKET = "X-Wanpire-Ticket"
 COOKIE = "wanpire_session"
@@ -112,8 +116,11 @@ class _Guard:
 
 def create_app(engine, broker: Broker, config: Config, account: Account, list_adapters,
                tick_s: float | None = 5.0, with_mcp: bool = True,
-               fail_delay_s: float = 0.5) -> FastAPI:
-    outbound = config.outbound[0]
+               fail_delay_s: float = 0.5, roles: Roles | None = None) -> FastAPI:
+    roles = roles or Roles(config, list_adapters)  # without modes and a file: read only
+
+    def outbound_now() -> str:  # the outbound adapter now: the roles may change while the server runs
+        return roles.config.outbound[0]
     # the MCP on the box calls the routes in process with this, made here and never written
     internal = secrets.token_urlsafe(32)
     sessions: dict[str, tuple] = {}  # session id -> the account's generation it was made under
@@ -185,7 +192,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
     for exc, code in ((UnknownTicket, 404), (NotHolder, 409), (LeaseEnded, 410),
                       (InvalidLink, 422), (InvalidPreset, 422), (InvalidConfig, 422),
                       (RefusedAdapter, 422), (CommandFailed, 500), (InvalidAccount, 422),
-                      (InvalidHold, 422)):
+                      (InvalidHold, 422), (ModeRefused, 500)):
         def handler(_r: Request, e: Exception, code=code):
             return error(code, str(e))
         app.add_exception_handler(exc, handler)
@@ -278,10 +285,10 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
     @app.get(f"{api}/status", dependencies=auth)
     def status():
         b = broker.status()  # first: it may clear an expired lease's link
-        link = engine.read(outbound)
+        link = engine.read(outbound_now())
         if not (link["down"].get("applied") or link["up"].get("applied")):
             described[0] = None
-        return {"mode": config.mode, "outbound": outbound, "link": link,
+        return {"mode": roles.config.mode, "outbound": outbound_now(), "link": link,
                 "applied": described[0], "broker": b}
 
     @app.post(f"{api}/lease", dependencies=auth)
@@ -295,11 +302,11 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
     def poll(ticket: str = Depends(ticket_of)):
         a = broker.poll(ticket)
         if a.holds:
-            link = engine.read(outbound)
+            link = engine.read(outbound_now())
             lifetime = broker.lifetime_s(ticket)
             if lifetime is not None and (link["down"].get("applied") or
                                          link["up"].get("applied")):
-                engine.renew(outbound, lifetime_s=lifetime)
+                engine.renew(outbound_now(), lifetime_s=lifetime)
         return answer(a)
 
     @app.delete(f"{api}/lease", dependencies=auth, status_code=204)
@@ -315,7 +322,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
 
     @app.get(f"{api}/link", dependencies=auth)
     def read_link():
-        return engine.read(outbound)
+        return engine.read(outbound_now())
 
     @app.put(f"{api}/link", dependencies=auth)
     def apply_link(body: dict = Body(...), ticket: str = Depends(ticket_of)):
@@ -331,7 +338,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
             link, account = catalogue.preview(str(body["near"]), str(body["far"]))
         else:
             link = Link.from_dict({k: body[k] for k in figures})
-        engine.apply(outbound, link, lifetime_s=broker.lifetime_s(ticket))
+        engine.apply(outbound_now(), link, lifetime_s=broker.lifetime_s(ticket))
         described[0] = ({"figures": True} if account is None else
                         {end: f"{account[end]['endpoint']}:{account[end]['channel']}"
                          for end in ("near", "far")})
@@ -343,7 +350,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
     @app.delete(f"{api}/link", dependencies=auth, status_code=204)
     def clear_link(ticket: str = Depends(ticket_of)):
         broker.require(ticket)
-        engine.clear(outbound)
+        engine.clear(outbound_now())
         described[0] = None
         return Response(status_code=204)
 
@@ -373,7 +380,25 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
 
     @app.get(f"{api}/adapters", dependencies=auth)
     def adapters():
-        return [dict(a.to_dict(), role=config.role(a.name)) for a in list_adapters()]
+        return [dict(a.to_dict(), role=roles.config.role(a.name)) for a in list_adapters()]
+
+    @app.get(f"{api}/roles", dependencies=auth)
+    def read_roles():
+        return roles.view()
+
+    @app.put(f"{api}/roles", dependencies=auth)
+    def change_roles(body: dict = Body(...)):
+        aps = body.get("access_points") or {}
+        if not isinstance(aps, dict):
+            raise _Status(422, "access_points must map an adapter to its ssid and passphrase")
+        link = engine.read(outbound_now())
+        if (link["down"].get("applied") or link["up"].get("applied")
+                or broker.status()["holder"] is not None):
+            raise _Status(409, "the roles change only with no link applied and no lease held: "
+                               "clear the link and release the lease first")
+        roles.change(str(body.get("inbound") or ""), str(body.get("outbound") or ""), aps)
+        described[0] = None
+        return roles.view()
 
     # the MCP: a client of the routes above, through the app itself (no socket)
     if with_mcp:

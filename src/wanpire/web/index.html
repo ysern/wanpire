@@ -209,6 +209,54 @@
       <!-- Adapters / Roles -->
       <div class="page" id="page-adapters-list" hidden>
         <section class="panel">
+          <div class="head"><h2>Roles</h2></div>
+          <p class="desc">The two adapters the line runs through. A Wi-Fi adapter becomes an access point that the device joins, on 5 GHz with WPA2 or WPA3. The roles change only with no link applied and no lease held.</p>
+          <form id="roles-form" class="form" novalidate>
+            <label for="role-inbound">Inbound adapter:</label>
+            <div class="control">
+              <select id="role-inbound"></select>
+              <p class="help">Faces the wider network.</p>
+            </div>
+            <div id="ap-inbound" class="ap-fields" hidden>
+              <label for="ap-inbound-ssid">Network name:</label>
+              <div class="control">
+                <input id="ap-inbound-ssid" type="text" autocomplete="off" spellcheck="false">
+                <p id="ap-inbound-ssid-error" class="help bad" role="alert"></p>
+              </div>
+              <label for="ap-inbound-pass">Password:</label>
+              <div class="control">
+                <input id="ap-inbound-pass" type="text" autocomplete="off" spellcheck="false">
+                <p id="ap-inbound-pass-error" class="help bad" role="alert"></p>
+              </div>
+            </div>
+            <label for="role-outbound">Outbound adapter:</label>
+            <div class="control">
+              <select id="role-outbound"></select>
+              <p class="help">Faces the device under test; every impairment lives on it.</p>
+              <p id="role-error" class="help bad" role="alert"></p>
+            </div>
+            <div id="ap-outbound" class="ap-fields" hidden>
+              <label for="ap-outbound-ssid">Network name:</label>
+              <div class="control">
+                <input id="ap-outbound-ssid" type="text" autocomplete="off" spellcheck="false">
+                <p id="ap-outbound-ssid-error" class="help bad" role="alert"></p>
+              </div>
+              <label for="ap-outbound-pass">Password:</label>
+              <div class="control">
+                <input id="ap-outbound-pass" type="text" autocomplete="off" spellcheck="false">
+                <p class="help">8 to 63 characters; the device joins with it.</p>
+                <p id="ap-outbound-pass-error" class="help bad" role="alert"></p>
+              </div>
+            </div>
+            <span></span>
+            <div class="control">
+              <button id="roles-save" type="submit" class="primary">Save</button>
+              <p id="roles-message" class="help" role="status"></p>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel">
           <div class="head"><h2>Adapters</h2></div>
           <p class="desc">The box's network adapters and the role each one plays.</p>
           <div class="table"><table id="adapters-table">

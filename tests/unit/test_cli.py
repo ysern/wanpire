@@ -210,6 +210,35 @@ def test_serve_starts_without_an_account(tmp_path, monkeypatch, capsys):
     assert "no account yet" in err and "web page" in err
 
 
+def test_serve_gives_the_api_roles_it_can_change(tmp_path, monkeypatch):
+    pytest.importorskip("fastapi")
+    import uvicorn
+
+    import wanpire.api
+    from wanpire.config import config_from_dict
+    cfg = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
+                            "adapters": {"control": "wlan0", "inbound": "eth0",
+                                         "outbound": ["eth1"]}})
+    monkeypatch.setattr(cli, "load_config", lambda *_: cfg)
+    monkeypatch.setattr(cli, "list_adapters", lambda: [])
+    monkeypatch.setattr(cli, "make_engine", lambda **_: FakeEngine())
+    class FakeModes:
+        pass
+
+    monkeypatch.setattr(cli, "make_modes", lambda: FakeModes())
+    seen = {}
+    real = wanpire.api.create_app
+    monkeypatch.setattr(wanpire.api, "create_app",
+                        lambda **kw: seen.update(kw) or real(**dict(kw, with_mcp=False)))
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: None)
+    path = str(tmp_path / "wanpire.json")
+    assert cli.main(["serve", "--config", path, "--account-file", str(tmp_path / "account"),
+                     "--host", "127.0.0.1"]) == 0
+    roles = seen["roles"]
+    assert isinstance(roles.modes, FakeModes) and roles.path == path
+    assert roles.config is cfg
+
+
 def test_account_set_reads_the_password_from_stdin(tmp_path, monkeypatch, capsys):
     import io
 
