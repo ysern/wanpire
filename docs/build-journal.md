@@ -758,3 +758,22 @@ That SSH path caught a bug on its first real run. A password piped into `ssh` fr
 arrived with three invisible bytes in front of it: a UTF-8 byte-order mark. The account was set,
 and nothing could sign in to it. The code stripped the line ending but not the mark. It strips
 both now, with a test that feeds it exactly what PowerShell sends.
+
+## 2026-10-11 — Saying what the box is doing
+
+The page said what it had applied in a message line, "Applied: london:generic to
+los-angeles:generic.", which the next action replaced and no other tab ever saw. Now the header
+band says it, under the logo: `london:generic <> los-angeles:generic`, or `no link`. The band
+itself is a calm pastel while the line is a plain wire, and turns the wine red only while a link
+is applied, so you can tell from across the room. To make that true for every viewer, the API now
+remembers which ends it applied and forgets them the moment the engine reports nothing applied,
+whoever cleared it.
+
+A lease used to last only while its holder kept calling: right for an agent, wrong for a person
+who wants the link for the afternoon. A lease can now be asked for a length, from 10 minutes to
+a week, or until released. It needs no calls and survives closing the page, and the box's own
+dead-man timer is set to its end. A lease until released has no dead-man at all: only a release,
+ending it by hand, or a reboot clears it. The Broker page shows what is left.
+
+Smaller things the owner asked for: Endpoints moved next to Settings, each place now opens to
+its channels and their figures, and Counters is called Traffic.
