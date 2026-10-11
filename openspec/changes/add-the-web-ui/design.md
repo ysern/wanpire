@@ -69,7 +69,7 @@ The style is taken; nobody's brand is.
   shadows, in a centred column of about 1,070 px.
 - **Header band.** One saturated band about 160 px tall, a gradient of the primary colour,
   carrying the name and the top-level sections as white line icons in 44 px outlined circles,
-  each with its label under it: Link, Endpoints, Broker, Adapters, Settings. The active section's
+  each with its label under it: Link, Broker, Adapters, Endpoints, Settings. The active section's
   circle is filled with the accent and its label is bold.
 - **Side menu.** About 178 px wide, for a section's sub-pages: the open group is an
   accent-filled bar, the current child is marked with a dot in the primary colour.
@@ -135,6 +135,19 @@ for each request the length it will get once granted.
 
 Not taken: a custom length (the list covers a demo to a week; the API takes any length);
 releasing a kept lease on sign out (a person who chose an hour meant the hour).
+
+### U9. Places that open, and Endpoints before Settings (the owner, 2026-10-11)
+
+The header's sections are now Link, Broker, Adapters, Endpoints, Settings: what a person uses
+most first, the reference pages last. The Endpoints page was a table of places and a count of
+their channels. Each place is now a `<details>` row (name, country, channels, default), closed;
+opening it fetches the place's preset document once (`GET /api/v1/endpoints/{id}`) and lists its
+channels as cards, the default first and marked: the channel, its description, and a small
+table of delay, jitter, loss and bandwidth with a column each way. Cards rather than one wide
+table, so a phone's width needs no sideways scroll. Read-only: no control on the page.
+
+Not taken: every place open at once (eighty-four cards); the sources on each card (they are in
+the preset document and the API, and would triple the page).
 
 ### U6. Tests in a browser, against the real app
 

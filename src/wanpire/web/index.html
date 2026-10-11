@@ -53,9 +53,9 @@
       </div>
       <nav class="sections" aria-label="Sections">
         <a id="nav-link" href="#link"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-link"/></svg></span><span class="label">Link</span></a>
-        <a id="nav-endpoints" href="#endpoints"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-globe"/></svg></span><span class="label">Endpoints</span></a>
         <a id="nav-broker" href="#broker"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-people"/></svg></span><span class="label">Broker</span></a>
         <a id="nav-adapters" href="#adapters"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-port"/></svg></span><span class="label">Adapters</span></a>
+        <a id="nav-endpoints" href="#endpoints"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-globe"/></svg></span><span class="label">Endpoints</span></a>
         <a id="nav-settings" href="#settings"><span class="ring"><svg viewBox="0 0 24 24"><use href="#i-sliders"/></svg></span><span class="label">Settings</span></a>
       </nav>
     </div>
@@ -188,11 +188,8 @@
       <div class="page" id="page-endpoints-places" hidden>
         <section class="panel">
           <div class="head"><h2>Places</h2></div>
-          <p class="desc">The places a link is described by, and the kinds of connection each one offers.</p>
-          <div class="table"><table id="endpoints-table">
-            <thead><tr><th>Place</th><th>Country</th><th>Default channel</th><th>Channels</th></tr></thead>
-            <tbody></tbody>
-          </table></div>
+          <p class="desc">The places a link is described by. Open one to see its kinds of connection and what each does, down towards the device and up away from it.</p>
+          <div id="places" class="places"></div>
         </section>
       </div>
 

@@ -318,15 +318,82 @@ async function refresh() {
   }
 }
 
+// -- the Endpoints page: places that open to their channels (U9), read-only ------------------
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function fillPlaces(list) {
+  const box = $("places");
+  box.replaceChildren(...list.map((e) => {
+    const d = el("details", "place");
+    d.dataset.id = e.id;
+    const s = el("summary");
+    const n = Object.keys(e.channels).length;
+    s.append(el("span", "place-name", e.name), el("span", "place-facts",
+      `${e.country} · ${n} channel${n === 1 ? "" : "s"} · default ${e.default_channel.replaceAll("-", " ")}`));
+    d.append(s);
+    d.addEventListener("toggle", () => { if (d.open && !d.dataset.loaded) loadPlace(d, e); });
+    return d;
+  }));
+}
+
+function figure(dir, key) {
+  const v = dir[key];
+  if (key === "rate_mbit") return v ? num(v) : "no cap";
+  if (key === "loss_pct" && dir.burst_loss_pct) {
+    return `${num(dir.burst_loss_pct)} (bursts of ${num(dir.burst_length)})`;
+  }
+  return num(v || 0);
+}
+
+async function loadPlace(d, e) {
+  d.dataset.loaded = "1";
+  const res = await call("GET", `endpoints/${encodeURIComponent(e.id)}`);
+  if (!res.ok) { d.append(el("p", "bad", errorOf(res))); delete d.dataset.loaded; return; }
+  const doc = res.data;
+  const ids = Object.keys(doc.channels);
+  ids.sort((a, b) => (b === doc.default_channel) - (a === doc.default_channel));
+  const list = el("div", "channels");
+  for (const id of ids) {
+    const c = doc.channels[id];
+    const card = el("div", "channel");
+    const head = el("div", "channel-head");
+    head.append(el("span", "channel-name", id.replaceAll("-", " ")));
+    if (id === doc.default_channel) head.append(el("span", "tag", "default"));
+    card.append(head);
+    if (c.description) card.append(el("p", "channel-desc", c.description));
+    const t = el("table", "figures");
+    const hr = el("tr");
+    hr.append(el("th", "", ""), el("th", "", "Down"), el("th", "", "Up"));
+    t.append(el("thead"));
+    t.tHead.append(hr);
+    const body = el("tbody");
+    for (const [label, key] of [["Delay, ms", "delay_ms"], ["Jitter, ms", "jitter_ms"],
+      ["Loss, %", "loss_pct"], ["Bandwidth, Mbit/s", "rate_mbit"]]) {
+      const tr = el("tr");
+      tr.append(el("th", "", label), el("td", "", figure(c.down || {}, key)),
+        el("td", "", figure(c.up || {}, key)));
+      body.append(tr);
+    }
+    t.append(body);
+    card.append(t);
+    list.append(card);
+  }
+  d.append(list);
+}
+
 // -- endpoints, channels and the preview ----------------------------------------------------
 
 async function loadEndpoints() {
   const res = await call("GET", "endpoints");
   if (!res.ok) { say(errorOf(res), "bad"); return; }
   endpoints = res.data;
-  fillTable("endpoints-table", endpoints.map((e) => [
-    e.name, e.country, e.default_channel.replaceAll("-", " "),
-    Object.keys(e.channels).length + " kinds"]));
+  fillPlaces(endpoints);
   for (const [end, fallback] of [["near", 0], ["far", 1]]) {
     const sel = $(`${end}-endpoint`);
     const keep = sel.value;

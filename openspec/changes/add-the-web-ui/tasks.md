@@ -42,3 +42,8 @@
 
 - [x] 7.1 Failing tests: the choices, until released first; an hour kept when the page closes and found again; until released on the Broker page, ended by Release; while this page is open, released on close
 - [x] 7.2 `index.html`, `app.js` until green; try it on the Pi
+
+## 8. Places that open; Endpoints before Settings (U9, the owner, 2026-10-11)
+
+- [x] 8.1 Failing tests: the header's order; each place closed at first, opened to list its channels with their figures down and up, the default marked, nothing editable; AA contrast and no sideways scroll with a place open
+- [x] 8.2 `index.html`, `style.css`, `app.js` until green

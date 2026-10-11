@@ -163,9 +163,22 @@ ask for a confirmation and a reason first, and SHALL do nothing if the person ca
 - **WHEN** the person presses End lease, gives the reason "bench needed" and confirms
 - **THEN** the lease is ended with that reason
 
+### Requirement: Each place opens to show its channels
+
+The Endpoints page SHALL list every shipped place as a closed, read-only row naming the place,
+its country, how many channels it offers and its default. Opening a row SHALL list each of its
+channels with its description and its figures each way, down and up: delay, jitter, loss and
+bandwidth, the default marked. Nothing on it SHALL change the box.
+
+#### Scenario: London opened
+- **GIVEN** the Endpoints page
+- **WHEN** the person opens London
+- **THEN** its twelve channels are listed, generic marked as the default, each with its delay,
+  jitter, loss and bandwidth down and up, and there is no control that changes anything
+
 ### Requirement: The page looks like a home router's admin interface
 
-The page SHALL carry a header band with the sections Link, Endpoints, Broker, Adapters and
+The page SHALL carry a header band with the sections Link, Broker, Adapters, Endpoints and
 Settings, the active one marked; a side menu for a section's sub-pages; white panels on a light
 grey page in a centred column of about 1,070 px; forms with labels on the left; at most one
 primary button per section; and SHALL follow the browser's light or dark preference. It SHALL

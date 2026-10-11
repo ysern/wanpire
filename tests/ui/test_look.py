@@ -6,9 +6,10 @@ from playwright.sync_api import expect
 
 from .conftest import sign_in
 
-SECTIONS = ["link", "endpoints", "broker", "adapters", "settings"]
-PAGES = [("link", "link-set"), ("link", "link-counters"), ("endpoints", "endpoints-places"),
-         ("broker", "broker-queue"), ("adapters", "adapters-list"), ("settings", "settings-access")]
+SECTIONS = ["link", "broker", "adapters", "endpoints", "settings"]  # the header's order (U9)
+PAGES = [("link", "link-set"), ("link", "link-counters"), ("broker", "broker-queue"),
+         ("adapters", "adapters-list"), ("endpoints", "endpoints-places"),
+         ("settings", "settings-access")]
 
 # Every visible text's contrast with what is behind it. Behind a gradient, both ends count.
 CONTRAST_JS = r"""
@@ -69,6 +70,8 @@ def test_the_header_band_carries_the_sections(page):
     sign_in(page)
     for s in SECTIONS:
         expect(page.locator(f"#nav-{s}")).to_be_visible()
+    order = page.eval_on_selector_all(".sections a", "as => as.map(a => a.id)")
+    assert order == [f"nav-{s}" for s in SECTIONS]
     expect(page.locator("#nav-link")).to_have_attribute("aria-current", "page")
     expect(page.locator("#nav-link")).to_contain_text("Link")
     go(page, "broker")
@@ -99,7 +102,48 @@ def test_adapters_and_endpoints_are_listed(page):
     expect(page.locator("#adapters-table")).to_contain_text("eth1")
     expect(page.locator("#adapters-table")).to_contain_text("outbound")
     go(page, "endpoints")
-    expect(page.locator("#endpoints-table")).to_contain_text("Tokyo")
+    expect(page.locator("#places")).to_contain_text("Tokyo")
+
+
+def test_a_place_opens_to_its_channels(page):
+    sign_in(page)
+    go(page, "endpoints")
+    london = page.locator("#places details[data-id='london']")
+    expect(london.locator("summary")).to_contain_text("London")
+    expect(london.locator("summary")).to_contain_text("12 channels")
+    expect(london.locator(".channel")).to_have_count(0)  # closed, and not loaded yet
+    assert london.get_attribute("open") is None
+    london.locator("summary").click()
+    expect(london.locator(".channel")).to_have_count(12)
+    first = london.locator(".channel").first
+    expect(first).to_contain_text("generic")
+    expect(first).to_contain_text("default")
+    expect(first).to_contain_text("A typical connection in London")
+    for label in ("Delay, ms", "Jitter, ms", "Loss, %", "Bandwidth, Mbit/s", "Down", "Up"):
+        expect(first).to_contain_text(label)
+    expect(first).to_contain_text("50.9")  # London generic's bandwidth down
+    assert page.locator("#page-endpoints-places input, #page-endpoints-places select, "
+                        "#page-endpoints-places button").count() == 0
+
+
+@pytest.mark.parametrize("width", [360, 1280])
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_an_open_place_is_readable(browser, box, width, scheme):
+    context = browser.new_context(viewport={"width": width, "height": 900}, color_scheme=scheme)
+    page = context.new_page()
+    page.set_default_timeout(5000)
+    page.box = box
+    try:
+        sign_in(page)
+        expect(page.locator("#mode")).to_have_text("bridge")
+        page.goto(box.url + "/#endpoints")
+        page.locator("#places details[data-id='tokyo'] summary").click()
+        expect(page.locator("#places details[data-id='tokyo'] .channel")).to_have_count(12)
+        assert page.evaluate("document.documentElement.scrollWidth") <= width
+        result = page.evaluate(CONTRAST_JS)
+        assert result["failures"] == [], result["failures"]
+    finally:
+        context.close()
 
 
 def test_nothing_is_fetched_from_elsewhere(page):

@@ -314,6 +314,55 @@ button.secondary.danger { border-color: var(--danger); color: var(--danger); }
 .table td:first-child { border-radius: 8px 0 0 8px; }
 .table td:last-child { border-radius: 0 8px 8px 0; }
 
+/* -- the Endpoints page: places that open to their channels (U9) --------------------------- */
+
+.places { background: var(--tint); border-radius: 10px; padding: 8px 12px; }
+.place { background: var(--pill); border-radius: 8px; margin: 6px 0; }
+.place summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  list-style: none;
+}
+.place summary::-webkit-details-marker { display: none; }
+.place summary::before {   /* the browser's marker is lost on a flex summary: our own */
+  content: "\25B8";       /* ▸ */
+  flex: none;
+  color: var(--primary-text);
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.place[open] > summary::before { transform: rotate(90deg); }
+.place summary:focus-visible { outline: 2px solid var(--primary-1); outline-offset: 2px; border-radius: 8px; }
+.place-name { font-weight: 700; }
+.place-facts { color: var(--muted); }
+.channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 10px;
+  padding: 2px 12px 12px;
+}
+.channel { background: var(--tint); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.channel-head { display: flex; align-items: center; gap: 8px; }
+.channel-name { font-weight: 700; }
+.tag {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 10px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.channel-desc { color: var(--muted); margin: 6px 0 8px; overflow-wrap: anywhere; }
+.figures { width: 100%; border-collapse: collapse; }
+.figures th, .figures td { padding: 3px 6px 3px 0; text-align: right; font-variant-numeric: tabular-nums; }
+.figures th:first-child { text-align: left; font-weight: 400; color: var(--muted); }
+.figures thead th { font-weight: 700; color: var(--text); }
+
 .card {
   background: var(--tint);
   border-radius: 10px;
