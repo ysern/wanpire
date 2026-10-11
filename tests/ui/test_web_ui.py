@@ -1,6 +1,7 @@
 """The web UI in a headless browser, against the real app (spec: web-ui)."""
 
 import re
+import time
 
 import httpx
 import pytest
@@ -248,6 +249,72 @@ def test_the_band_line_sits_under_the_logo_on_its_left(page):
     line = page.locator("#band-link").bounding_box()
     assert line["y"] >= brand["y"] + brand["height"] - 1
     assert abs(line["x"] - brand["x"]) < 2
+
+
+# -- how long the link is held (K7) ---------------------------------------------------------
+
+def ask_for(page, hold):
+    page.select_option("#hold", hold)
+    page.fill("#purpose", "hold check")
+    page.click("#ask")
+    expect(page.locator("#lease-state")).to_contain_text("You hold the link")
+
+
+def test_the_hold_offers_until_released_first(page):
+    sign_in(page)
+    options = page.locator("#hold option").all_inner_texts()
+    assert options == ["until released", "10 min", "30 min", "1 hour", "5 hours", "1 day",
+                       "1 week", "while this page is open"]
+    assert page.locator("#hold").input_value() == "until-released"
+
+
+def test_an_hour_is_kept_when_the_page_closes(browser, box):
+    context = browser.new_context(viewport={"width": 1000, "height": 900})
+    page = context.new_page()
+    page.set_default_timeout(5000)
+    page.box = box
+    sign_in(page)
+    ask_for(page, "3600")
+    expect(page.locator("#lease-state")).to_contain_text("whether this page is open or not")
+    page.close()
+    holder = box.broker.status()["holder"]
+    assert holder and holder["hold"] == 3600
+    again = context.new_page()  # the same browser opens the page again
+    again.set_default_timeout(5000)
+    again.goto(box.url + "/")
+    expect(again.locator("#lease-state")).to_contain_text("You hold the link for another")
+    expect(again.locator("#release")).to_be_enabled()
+    again.goto(box.url + "/#broker")
+    expect(again.locator("#queue")).to_contain_text(re.compile(r"\d+ min \d+ s"))
+    context.close()
+
+
+def test_until_released_shows_on_the_broker_page_and_release_ends_it(page):
+    sign_in(page)
+    ask_for(page, "until-released")
+    page.goto(page.box.url + "/#broker")
+    expect(page.locator("#queue")).to_contain_text("until released")
+    page.goto(page.box.url + "/#link")
+    page.click("#release")
+    expect(page.locator("#lease-state")).to_contain_text("You do not hold the link")
+    assert page.box.broker.status()["holder"] is None
+
+
+def test_while_this_page_is_open_is_released_on_close(browser, box):
+    context = browser.new_context(viewport={"width": 1000, "height": 900})
+    page = context.new_page()
+    page.set_default_timeout(5000)
+    page.box = box
+    sign_in(page)
+    ask_for(page, "page")
+    page.goto(box.url + "/#broker")
+    expect(page.locator("#queue")).to_contain_text("while in use")
+    page.close(run_before_unload=True)
+    deadline = time.monotonic() + 5
+    while box.broker.status()["holder"] is not None and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert box.broker.status()["holder"] is None
+    context.close()
 
 
 # -- the lease ------------------------------------------------------------------------------

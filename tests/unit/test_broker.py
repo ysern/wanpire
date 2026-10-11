@@ -2,7 +2,7 @@
 
 import pytest
 
-from wanpire.broker import Broker, LeaseEnded, NotHolder, UnknownTicket
+from wanpire.broker import Broker, InvalidHold, LeaseEnded, NotHolder, UnknownTicket
 
 
 class Clock:
@@ -176,3 +176,71 @@ def test_releasing_a_queued_request_leaves_the_queue(broker):
 
 def test_tickets_differ(broker):
     assert broker.request("A", "x").ticket != broker.request("A", "x").ticket
+
+# -- a lease for a length of time (K7) -----------------------------------------------------
+
+def test_a_timed_lease_holds_without_calls(broker, clock, cleared):
+    a = broker.request("A", "demo", hold=3600)
+    assert a.holds and a.expires_in_s == 3600
+    clock.advance(3599)
+    s = broker.status()
+    assert s["holder"]["who"] == "A"
+    assert s["holder"]["hold"] == 3600 and s["holder"]["remaining_s"] == 1
+    assert cleared == []
+
+
+def test_a_timed_lease_ends_at_its_length(broker, clock, cleared):
+    a = broker.request("A", "demo", hold=600)
+    clock.advance(600)
+    assert broker.status()["holder"] is None
+    assert len(cleared) == 1
+    with pytest.raises(LeaseEnded, match="10 min"):
+        broker.poll(a.ticket)
+
+
+def test_until_released_never_expires(broker, clock, cleared):
+    a = broker.request("A", "soak", hold="until-released")
+    clock.advance(7 * 24 * 3600)
+    s = broker.status()
+    assert s["holder"]["who"] == "A"
+    assert s["holder"]["hold"] == "until-released" and s["holder"]["remaining_s"] is None
+    broker.release(a.ticket)
+    assert broker.status()["holder"] is None and len(cleared) == 1
+
+
+def test_a_timed_lease_counts_from_the_grant(broker, clock):
+    a = broker.request("A", "first")
+    b = broker.request("B", "second", hold=600)
+    assert broker.status()["queue"][0]["hold"] == 600
+    clock.advance(30)
+    broker.poll(b.ticket)  # still waiting: polls like any request
+    broker.release(a.ticket)
+    clock.advance(599)
+    s = broker.status()
+    assert s["holder"]["who"] == "B" and s["holder"]["remaining_s"] == 1
+
+
+def test_a_queued_timed_request_still_polls(broker, clock):
+    broker.request("A", "first", hold="until-released")
+    broker.request("B", "second", hold=600)
+    clock.advance(61)
+    assert broker.status()["queue"] == []
+
+
+def test_the_lifetime_for_the_dead_man(broker, clock):
+    a = broker.request("A", "x")
+    assert broker.lifetime_s(a.ticket) == broker.lease_ttl_s
+    broker.release(a.ticket)
+    t = broker.request("T", "x", hold=600)
+    clock.advance(100)
+    assert broker.lifetime_s(t.ticket) == 500
+    broker.release(t.ticket)
+    u = broker.request("U", "x", hold="until-released")
+    assert broker.lifetime_s(u.ticket) is None
+
+
+@pytest.mark.parametrize("hold", [10, 604801, "forever", -5, True])
+def test_an_invalid_hold_is_refused(broker, hold):
+    with pytest.raises(InvalidHold):
+        broker.request("A", "x", hold=hold)
+    assert broker.status()["holder"] is None

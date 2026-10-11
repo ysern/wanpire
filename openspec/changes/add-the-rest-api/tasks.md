@@ -26,5 +26,5 @@
 
 ## 5. The status names the link applied (R7, the owner, 2026-10-11)
 
-- [ ] 5.1 Failing tests: `applied` from ends (channels resolved), from figures, null after a clear by hand and by the broker
-- [ ] 5.2 Implement in `api.py` until green
+- [x] 5.1 Failing tests: `applied` from ends (channels resolved), from figures, null after a clear by hand and by the broker
+- [x] 5.2 Implement in `api.py` until green

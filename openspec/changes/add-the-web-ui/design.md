@@ -122,6 +122,20 @@ message line keeps a short acknowledgement only.
 Not taken: a banner inside the Link page (only that page shows it); a coloured dot (small, and
 it says nothing of which link); keeping the band red always (the red then carries no meaning).
 
+### U8. How long to hold the link (the owner, 2026-10-11)
+
+The Lease section offers **Hold the link:** until released (chosen first, as the owner listed
+it), 10 min, 30 min, 1 hour, 5 hours, 1 day, 1 week, or while this page is open (the first
+version's only kind). A length is sent as the broker's `hold` (K7 of `add-the-broker`); its
+ticket is kept in `localStorage`, so closing the page keeps the lease and opening it again in the
+same browser finds it, and signing out keeps it too. A lease while the page is open stays as it
+was: its ticket in `sessionStorage`, released when the page closes or signs out. The Broker
+page's table gains **Remaining**: the holder's time left, "until released" or "while in use", and
+for each request the length it will get once granted.
+
+Not taken: a custom length (the list covers a demo to a week; the API takes any length);
+releasing a kept lease on sign out (a person who chose an hour meant the hour).
+
 ### U6. Tests in a browser, against the real app
 
 `tests/ui/` starts uvicorn in a thread on a free port with the real `create_app`, the recording

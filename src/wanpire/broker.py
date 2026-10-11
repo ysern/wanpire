@@ -4,7 +4,9 @@ A client asks with who it is and its purpose, and gets a ticket. A free link giv
 the **lease**; otherwise the ticket waits in a **queue**, in order of arrival.
 
 - A queued ticket lives while it is polled (``queue_ttl_s``, 60 s by default).
-- A lease lives while its holder calls (``lease_ttl_s``, 120 s by default).
+- A lease lives while its holder calls (``lease_ttl_s``, 120 s by default), unless it was asked
+  with a ``hold``: a number of seconds, which it lasts from its grant without any call, or
+  ``"until-released"``, which never expires by time.
 - When a lease ends (released, expired, or ended by hand) the link is cleared, then the lease
   passes to the head of the queue, whose TTL starts then.
 - Only changes need the lease (``require``); reading the status needs nothing.
@@ -23,10 +25,38 @@ from dataclasses import dataclass
 
 DEFAULT_LEASE_TTL_S = 120
 DEFAULT_QUEUE_TTL_S = 60
+UNTIL_RELEASED = "until-released"
+MIN_HOLD_S = 60
+MAX_HOLD_S = 7 * 24 * 3600
 
 
 class BrokerError(RuntimeError):
     pass
+
+
+class InvalidHold(ValueError):
+    """A lease's length that is neither seconds in range nor until released."""
+
+
+def check_hold(hold):
+    """None (while used), seconds from 60 s to 7 days, or ``"until-released"``."""
+    if hold is None or hold == UNTIL_RELEASED:
+        return hold
+    if isinstance(hold, bool) or not isinstance(hold, (int, float)) or \
+            not MIN_HOLD_S <= hold <= MAX_HOLD_S:
+        raise InvalidHold(f"a lease's hold is a number of seconds from {MIN_HOLD_S} to "
+                          f"{MAX_HOLD_S}, or {UNTIL_RELEASED!r}; not {hold!r}")
+    return float(hold)
+
+
+def _length(seconds: float) -> str:
+    m = round(seconds / 60)
+    if m < 60:
+        return f"{m} min"
+    if m % (24 * 60) == 0:
+        d = m // (24 * 60)
+        return f"{d} day" + ("s" if d > 1 else "")
+    return f"{m / 60:g} h"
 
 
 class UnknownTicket(BrokerError):
@@ -49,6 +79,7 @@ class _Entry:
     asked_at: float
     last_seen: float
     granted_at: float | None = None
+    hold: float | str | None = None  # None: while used; seconds; or UNTIL_RELEASED
 
 
 @dataclass(frozen=True)
@@ -76,11 +107,12 @@ class Broker:
 
     # -- public -----------------------------------------------------------------------------
 
-    def request(self, who: str, purpose: str) -> Answer:
+    def request(self, who: str, purpose: str, hold=None) -> Answer:
         """Ask for the link: the lease if it is free, a place in the queue otherwise."""
+        hold = check_hold(hold)
         with self._lock:
             now = self._settle()
-            e = _Entry(secrets.token_hex(16), who, purpose, now, now)
+            e = _Entry(secrets.token_hex(16), who, purpose, now, now, hold=hold)
             if self._holder is None and not self._queue:
                 e.granted_at = now
                 self._holder = e
@@ -126,6 +158,16 @@ class Broker:
                 self._ended[self._holder.ticket] = f"your lease was ended by hand: {reason}"
                 self._end_lease()
 
+    def lifetime_s(self, ticket: str) -> float | None:
+        """The dead-man's lifetime for a link applied under ``ticket``'s lease: the TTL for a
+        lease that lives while used, the time left for a timed one, None until released."""
+        with self._lock:
+            now = self._settle()
+            e = self._find(ticket)
+            if e.hold is None:
+                return self.lease_ttl_s
+            return self._remaining(e, now)
+
     def status(self) -> dict:
         with self._lock:
             now = self._settle()
@@ -134,9 +176,11 @@ class Broker:
                 "holder": None if h is None else {
                     "who": h.who, "purpose": h.purpose,
                     "held_s": round(now - h.granted_at, 1),
-                    "expires_in_s": round(h.last_seen + self.lease_ttl_s - now, 1),
+                    "expires_in_s": self._expires_in(h, now),
+                    "hold": h.hold,
+                    "remaining_s": self._remaining(h, now),
                 },
-                "queue": [{"who": q.who, "purpose": q.purpose,
+                "queue": [{"who": q.who, "purpose": q.purpose, "hold": q.hold,
                            "waiting_s": round(now - q.asked_at, 1),
                            "expires_in_s": round(q.last_seen + self.queue_ttl_s - now, 1)}
                           for q in self._queue],
@@ -158,17 +202,33 @@ class Broker:
         raise UnknownTicket("unknown ticket: it expired from the queue, or was never issued; "
                             "ask for the link again")
 
+    def _remaining(self, e: _Entry, now: float) -> float | None:
+        """A lease's time left: None until released; for one that lives while used, its TTL."""
+        if e.hold == UNTIL_RELEASED:
+            return None
+        if e.hold is None:
+            return round(e.last_seen + self.lease_ttl_s - now, 1)
+        return round(e.granted_at + e.hold - now, 1)
+
+    def _expires_in(self, e: _Entry, now: float) -> float | None:
+        if e is self._holder:
+            return self._remaining(e, now)
+        return round(e.last_seen + self.queue_ttl_s - now, 1)
+
     def _answer(self, e: _Entry, now: float) -> Answer:
         if e is self._holder:
-            return Answer(e.ticket, True, 0, round(e.last_seen + self.lease_ttl_s - now, 1))
-        return Answer(e.ticket, False, self._queue.index(e) + 1,
-                      round(e.last_seen + self.queue_ttl_s - now, 1))
+            return Answer(e.ticket, True, 0, self._expires_in(e, now))
+        return Answer(e.ticket, False, self._queue.index(e) + 1, self._expires_in(e, now))
 
     def _settle(self) -> float:
         now = self._clock()
-        if self._holder and now - self._holder.last_seen > self.lease_ttl_s:
-            self._ended[self._holder.ticket] = (
+        h = self._holder
+        if h and h.hold is None and now - h.last_seen > self.lease_ttl_s:
+            self._ended[h.ticket] = (
                 f"your lease expired: no call for more than {self.lease_ttl_s:g} s")
+            self._end_lease(now)
+        elif h and isinstance(h.hold, float) and now >= h.granted_at + h.hold:
+            self._ended[h.ticket] = f"your lease's {_length(h.hold)} ended"
             self._end_lease(now)
         self._queue = [q for q in self._queue if now - q.last_seen <= self.queue_ttl_s]
         if self._holder is None and self._queue:

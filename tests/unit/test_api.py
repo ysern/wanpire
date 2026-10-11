@@ -378,6 +378,38 @@ def test_the_status_forgets_the_link_the_broker_cleared(box):
     assert applied(box) is None
 
 
+def test_a_lease_for_an_hour(box):
+    r = box.post("/api/v1/lease", json={"who": "web: admin", "purpose": "demo", "hold": 3600},
+                 headers=AUTH)
+    assert r.status_code == 200 and r.json()["holds"]
+    h = box.get("/api/v1/status", headers=AUTH).json()["broker"]["holder"]
+    assert h["hold"] == 3600 and h["remaining_s"] == 3600
+
+
+@pytest.mark.parametrize("hold", [10, "forever", 10 ** 7])
+def test_a_hold_out_of_range(box, hold):
+    r = box.post("/api/v1/lease", json={"who": "A", "purpose": "x", "hold": hold}, headers=AUTH)
+    assert r.status_code == 422 and "until-released" in r.json()["error"]
+
+
+def test_a_timed_lease_sets_the_dead_man_to_its_time_left(box):
+    r = box.post("/api/v1/lease", json={"who": "A", "purpose": "x", "hold": 600}, headers=AUTH)
+    ticket = r.json()["ticket"]
+    box.clock.t += 100
+    box.put("/api/v1/link", json={"near": "london", "far": "tokyo"}, headers=t(ticket))
+    assert box.engine.calls[-1][0] == "apply" and box.engine.calls[-1][3] == 500
+
+
+def test_a_lease_until_released_has_no_dead_man(box):
+    r = box.post("/api/v1/lease", json={"who": "A", "purpose": "x", "hold": "until-released"},
+                 headers=AUTH)
+    ticket = r.json()["ticket"]
+    box.put("/api/v1/link", json={"near": "london", "far": "tokyo"}, headers=t(ticket))
+    assert box.engine.calls[-1][0] == "apply" and box.engine.calls[-1][3] is None
+    box.post("/api/v1/lease/poll", headers=t(ticket))
+    assert not [c for c in box.engine.calls if c[0] == "renew"]
+
+
 def test_reading_the_link_needs_no_ticket(box):
     r = box.get("/api/v1/link", headers=AUTH)
     assert r.status_code == 200 and r.json()["down"]["applied"] is False

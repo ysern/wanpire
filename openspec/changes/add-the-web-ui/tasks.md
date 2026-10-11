@@ -35,5 +35,10 @@
 
 ## 6. The band shows the link (U7, the owner, 2026-10-11)
 
-- [ ] 6.1 Failing tests: the band's line from ends, from figures and with none, following another client's apply and clear; pastel when none, wine red when applied; AA contrast on the band in both states and themes
-- [ ] 6.2 `index.html`, `style.css`, `app.js` until green; try it on the Pi
+- [x] 6.1 Failing tests: the band's line from ends, from figures and with none, following another client's apply and clear; pastel when none, wine red when applied; AA contrast on the band in both states and themes
+- [x] 6.2 `index.html`, `style.css`, `app.js` until green; try it on the Pi
+
+## 7. How long to hold the link (U8, the owner, 2026-10-11)
+
+- [x] 7.1 Failing tests: the choices, until released first; an hour kept when the page closes and found again; until released on the Broker page, ended by Release; while this page is open, released on close
+- [x] 7.2 `index.html`, `app.js` until green; try it on the Pi

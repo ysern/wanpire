@@ -47,7 +47,7 @@ from starlette.routing import Route
 
 from . import catalogue
 from .account import Account, InvalidAccount, check
-from .broker import Broker, LeaseEnded, NotHolder, UnknownTicket
+from .broker import Broker, InvalidHold, LeaseEnded, NotHolder, UnknownTicket
 from .config import Config, InvalidConfig
 from .engine import CommandFailed, RefusedAdapter
 from .model import InvalidLink, Link
@@ -184,7 +184,8 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
 
     for exc, code in ((UnknownTicket, 404), (NotHolder, 409), (LeaseEnded, 410),
                       (InvalidLink, 422), (InvalidPreset, 422), (InvalidConfig, 422),
-                      (RefusedAdapter, 422), (CommandFailed, 500), (InvalidAccount, 422)):
+                      (RefusedAdapter, 422), (CommandFailed, 500), (InvalidAccount, 422),
+                      (InvalidHold, 422)):
         def handler(_r: Request, e: Exception, code=code):
             return error(code, str(e))
         app.add_exception_handler(exc, handler)
@@ -288,14 +289,17 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
         who, purpose = body.get("who"), body.get("purpose")
         if not who or not purpose:
             raise _Status(422, "asking for the link needs 'who' and 'purpose'")
-        return answer(broker.request(str(who), str(purpose)))
+        return answer(broker.request(str(who), str(purpose), hold=body.get("hold")))
 
     @app.post(f"{api}/lease/poll", dependencies=auth)
     def poll(ticket: str = Depends(ticket_of)):
         a = broker.poll(ticket)
-        if a.holds and engine.read(outbound)["down"].get("applied") or \
-                a.holds and engine.read(outbound)["up"].get("applied"):
-            engine.renew(outbound, lifetime_s=broker.lease_ttl_s)
+        if a.holds:
+            link = engine.read(outbound)
+            lifetime = broker.lifetime_s(ticket)
+            if lifetime is not None and (link["down"].get("applied") or
+                                         link["up"].get("applied")):
+                engine.renew(outbound, lifetime_s=lifetime)
         return answer(a)
 
     @app.delete(f"{api}/lease", dependencies=auth, status_code=204)
@@ -327,7 +331,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
             link, account = catalogue.preview(str(body["near"]), str(body["far"]))
         else:
             link = Link.from_dict({k: body[k] for k in figures})
-        engine.apply(outbound, link, lifetime_s=broker.lease_ttl_s)
+        engine.apply(outbound, link, lifetime_s=broker.lifetime_s(ticket))
         described[0] = ({"figures": True} if account is None else
                         {end: f"{account[end]['endpoint']}:{account[end]['channel']}"
                          for end in ("near", "far")})

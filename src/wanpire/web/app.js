@@ -1,7 +1,8 @@
 // wanpire's web page: a client of the REST API under /api/v1, and nothing more.
 // The first visit makes the box's account; afterwards the page signs in with it and holds a
 // session cookie it cannot read, so the browser's storage keeps no credential. The lease's
-// ticket is in sessionStorage (one tab, one client). Plain JS, no build step.
+// ticket is in sessionStorage (one tab, one client), or in localStorage for a lease with a
+// length, which outlives the page. Plain JS, no build step.
 "use strict";
 
 const API = "api/v1";
@@ -18,7 +19,8 @@ const store = {
 };
 
 let user = null; // the account signed in, from the box
-let ticket = store.get("sessionStorage", "wanpire.ticket");
+let ticket = null; // loaded on entering (loadTicket)
+let kept = false; // the lease has a length and outlives this page (K7)
 let holds = false;
 let leaseTtl = 120;
 let endpoints = [];
@@ -144,7 +146,9 @@ function leave() {
   user = null;
   clearInterval(statusTimer);
   statusTimer = null;
-  setTicket(null);
+  clearInterval(pollTimer); // the stored ticket stays: signing in again finds the lease
+  pollTimer = null;
+  ticket = null;
   holds = false;
   $("app").hidden = true;
   $("signin-wrap").hidden = false;
@@ -197,7 +201,11 @@ $("signin").addEventListener("submit", async (ev) => {
 });
 
 $("signout").addEventListener("click", async () => {
-  if (ticket) await send("DELETE", "lease", undefined, true).catch(() => {});
+  // a lease held while the page is open ends with it; one with a length is kept
+  if (ticket && !kept) {
+    await send("DELETE", "lease", undefined, true).catch(() => {});
+    setTicket(null);
+  }
   await send("DELETE", "session").catch(() => {});
   showSignIn("");
 });
@@ -232,6 +240,7 @@ async function enter(who) {
   }
   clearInterval(statusTimer);
   statusTimer = setInterval(() => refresh().catch(() => {}), STATUS_EVERY_MS);
+  loadTicket();
   if (ticket) await pollOnce();
   showLease();
 }
@@ -273,18 +282,30 @@ async function refresh() {
 
   const rows = $("queue").tBodies[0];
   rows.replaceChildren();
-  const row = (place, who, purpose, since) => {
+  const row = (place, who, purpose, since, remaining) => {
     const tr = document.createElement("tr");
-    for (const text of [place, who, purpose, since]) {
+    for (const text of [place, who, purpose, since, remaining]) {
       const td = document.createElement("td");
       td.textContent = text;
       tr.append(td);
     }
     rows.append(tr);
   };
-  if (b.holder) row("holds", b.holder.who, b.holder.purpose, duration(b.holder.held_s));
-  b.queue.forEach((q, i) => row(ordinal(i + 1), q.who, q.purpose, duration(q.waiting_s)));
-  if (!rows.children.length) row("", "nobody", "", "");
+  const left = (h) => {
+    if (h.hold === "until-released") return "until released";
+    if (h.hold === null || h.hold === undefined) return "while in use";
+    return duration(h.remaining_s);
+  };
+  const asked = (q) => {
+    if (q.hold === "until-released") return "until released";
+    if (q.hold === null || q.hold === undefined) return "while in use";
+    return `${duration(q.hold)} once granted`;
+  };
+  if (b.holder) {
+    row("holds", b.holder.who, b.holder.purpose, duration(b.holder.held_s), left(b.holder));
+  }
+  b.queue.forEach((q, i) => row(ordinal(i + 1), q.who, q.purpose, duration(q.waiting_s), asked(q)));
+  if (!rows.children.length) row("", "nobody", "", "", "");
 
   $("end-lease").hidden = !b.holder || holds;
   if (b.last_clear_error) say(`The last clear failed: ${b.last_clear_error}`, "bad");
@@ -368,12 +389,28 @@ for (const end of ["near", "far"]) {
 
 // -- the lease ------------------------------------------------------------------------------
 
-function setTicket(t) {
-  ticket = t;
-  store.set("sessionStorage", "wanpire.ticket", t);
+// A lease held while this page is open lives in sessionStorage (one tab, one client) and is
+// released when the page closes. A lease with a length (K7) is kept across closing: its ticket
+// is in localStorage, so this browser finds it again.
+function startPolling() {
   clearInterval(pollTimer);
   pollTimer = null;
-  if (t) pollTimer = setInterval(() => pollOnce().catch(() => {}), (leaseTtl / 3) * 1000);
+  if (ticket) pollTimer = setInterval(() => pollOnce().catch(() => {}), (leaseTtl / 3) * 1000);
+}
+
+function setTicket(t, keep) {
+  ticket = t;
+  kept = !!(t && keep);
+  store.set("sessionStorage", "wanpire.ticket", t && !keep ? t : null);
+  store.set("localStorage", "wanpire.kept-ticket", t && keep ? t : null);
+  startPolling();
+}
+
+function loadTicket() {
+  const k = store.get("localStorage", "wanpire.kept-ticket");
+  ticket = k || store.get("sessionStorage", "wanpire.ticket");
+  kept = !!k;
+  startPolling();
 }
 
 function showLease(text) {
@@ -389,8 +426,13 @@ function showLease(text) {
 function answered(a) {
   const had = holds;
   holds = a.holds;
-  showLease(holds
-    ? "You hold the link. This page keeps it while it stays open."
+  let held = "You hold the link. This page keeps it while it stays open.";
+  if (kept) {
+    held = a.expires_in_s === null || a.expires_in_s === undefined
+      ? "You hold the link until you release it, whether this page is open or not."
+      : `You hold the link for another ${duration(a.expires_in_s)}, whether this page is open or not.`;
+  }
+  showLease(holds ? held
     : `You are ${ordinal(a.position)} in the queue; waiting while this page is open.`);
   if (holds && !had) refresh().catch(() => {});
 }
@@ -412,9 +454,12 @@ async function pollOnce() {
 
 $("ask").addEventListener("click", async () => {
   const purpose = $("purpose").value.trim() || "testing from the web page";
-  const res = await call("POST", "lease", { who: `web: ${user}`, purpose });
+  const choice = $("hold").value;
+  const body = { who: `web: ${user}`, purpose };
+  if (choice !== "page") body.hold = choice === "until-released" ? choice : Number(choice);
+  const res = await call("POST", "lease", body);
   if (!res.ok) { say(errorOf(res), "bad"); return; }
-  setTicket(res.data.ticket);
+  setTicket(res.data.ticket, choice !== "page");
   answered(res.data);
   say("");
 });
@@ -443,7 +488,7 @@ $("release").addEventListener("click", async () => {
 });
 
 window.addEventListener("pagehide", () => {
-  if (!ticket || !user) return;
+  if (!ticket || !user || kept) return; // a lease with a length outlives the page
   // a closed page gives the link back; a browser that dies is covered by the TTL
   fetch(`${API}/lease`, {
     method: "DELETE", keepalive: true, credentials: "same-origin",
