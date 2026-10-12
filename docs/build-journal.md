@@ -836,3 +836,12 @@ IPv6 from a router advertisement, and no DHCP hook may rewrite the name servers.
 through it by a table of its own. On the Pi it joined in eighteen seconds at Wi-Fi 6 rates,
 pinged its gateway, and left again, while the SSH session over the built-in radio carried on as
 if nothing had happened. A timer had been set to switch the adapter off had it not.
+
+## 2026-10-12 — Saved from the page
+
+The last box on the list was the one nobody had wanted to tick, because saving roles re-sets the
+line the owner's own traffic runs on. The owner did it anyway: on the Adapters / Roles page, bridge
+mode, the on-board port in, the USB Wi-Fi stick out as an access point, country GB, a name and a
+password, Save. wanpire's hostapd came up bridged to the on-board port, and a phone joined with what
+had been typed on the page. The owner's verdict on the page was that it is good, and the box stayed
+as it was saved.

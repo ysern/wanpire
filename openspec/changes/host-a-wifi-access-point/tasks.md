@@ -31,7 +31,7 @@
 
 - [x] 6.1 Failing tests: `--wifi-driver --dry-run` prints the steps, the country from `--wifi-country`, an unrecognised adapter named
 - [x] 6.2 Implement in `install.sh` until green (the install tests pass on the box)
-- [ ] 6.3 On the box: the roles saved from the page with the USB adapter as outbound in bridge mode, the access point up, then put back as it was (not done: it re-sets the running line, which carries the owner's traffic; open question O9)
+- [x] 6.3 On the box: the roles saved from the page with the USB adapter as outbound in bridge mode, the access point up (done by the owner, 2026-10-12: from the Adapters / Roles page, bridge mode, inbound `eth0`, outbound the USB Wi-Fi adapter as an access point, country GB, Save; wanpire's own hostapd came up bridged to `eth0` and the owner's phone joined with the network name and password set on the page. The owner judged the page good and kept these roles, so they were not put back; O9 answered)
 - [x] 6.4 README (the adapters known to work), journal, open questions
 
 ## 7. A Wi-Fi inbound adapter is a client, in router mode (the owner, 2026-10-11)

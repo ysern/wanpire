@@ -64,6 +64,10 @@ recommends a MediaTek MT7612U or MT7921AU adapter (in-kernel `mt76`, AP mode pro
 - **The country:** the Pi's built-in radio reports a code of its own ("98") as the global
   regulatory domain; the country the system asked for is in the kernel's `ieee80211_regdom`, and
   the install now reads it from there when `iw reg get` names none.
+- **The roles from the page, on the box (2026-10-12):** the owner saved bridge mode from the
+  Adapters / Roles page, inbound `eth0` and outbound the USB Wi-Fi adapter as an access point,
+  country GB. wanpire's own hostapd came up bridged to `eth0`, and the owner's phone joined with
+  the network name and password set on the page. The owner judged the page good and kept the roles.
 
 ## Findings in full
 
@@ -161,3 +165,12 @@ more with a USB radio and a USB Ethernet adapter on the box; the README should s
 The driver logs `timed out to flush queues` now and then (five times in 15 minutes, with good
 power and no visible effect on playback), most likely as a client dozes or leaves; noted, not a
 fault.
+
+### The roles saved from the page
+
+On 2026-10-12 the owner opened the Adapters / Roles page on the box, chose bridge mode with `eth0`
+as inbound and the USB Wi-Fi adapter as outbound, gave a network name, a password and the country
+GB, and saved. The line was set up again with wanpire's own hostapd on the adapter, bridged to
+`eth0`, and the owner's phone joined it with the name and password given on the page. The owner
+judged the page good, and the box was left in these roles. Router mode with a Wi-Fi inbound joining
+a network has not yet been saved from the page on the box.
