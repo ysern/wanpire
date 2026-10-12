@@ -55,13 +55,13 @@ gigabit segments, a machine behind each, driven through the REST API:
 | Throughput through 150 ms each way | — | towards the device: 760 Mbit/s, nothing lost; away from it: 600 Mbit/s, nothing lost, then 3% lost at 700 |
 
 Forwarding runs on one of the four cores. How each figure was taken, and what is not yet
-understood about the last one, is in the spike's [findings](openspec/changes/design-the-link-emulator/spikes/netem-on-a-pi.md).
+understood about the last one, is in the spike's [findings](openspec/changes/archive/2026-10-12-design-the-link-emulator/spikes/netem-on-a-pi.md).
 
 ## Status
 
 Early. The engine, the endpoint presets, the two modes, the broker, the REST API, a web page, an MCP server for agents and a command line work. What there is:
 
-- the design and the first measurements: [`openspec/changes/design-the-link-emulator/`](openspec/changes/design-the-link-emulator/)
+- the design and the first measurements: [`openspec/changes/archive/2026-10-12-design-the-link-emulator/`](openspec/changes/archive/2026-10-12-design-the-link-emulator/)
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
 - what is assumed and what is still open: [`docs/open-questions.md`](docs/open-questions.md)
 
