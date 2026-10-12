@@ -138,3 +138,26 @@ first to take the adapter down had the session been lost; it was not needed. `dh
 configuration file (`-f /dev/null`) still asks for and installs the gateway. The line's own
 routing rule (router mode with outbound) was not tried on the box: the outbound adapter is a port
 of the running bridge.
+
+### A phone through the access point, and the box's power
+
+The owner joined a phone to a test access point on the USB adapter (wanpire's `AccessPoint`, with
+a DHCP server and NAT out through the built-in radio added by hand for the test, outside wanpire's
+roles). The phone linked at 780 Mbit/s both ways (80 MHz, two streams) at -28 dBm. A public speed
+test gave 34.2 Mbit/s down, 10.5 up and 16 ms, against 62.7, 9.6 and 14 ms on the home network
+directly. The fall in download is this test's path, not the access point's: every packet crossed
+the air twice, home router to the built-in radio then access point to phone, both in one 80 MHz
+block (channels 40 and 36), and upload is the internet line's own limit. In wanpire's real use the
+inbound is wired, so neither applies; channel 149 would keep an access point clear of a control
+network in the lower block. Several minutes of 1080p and 4K video played smoothly.
+
+**On the first supply the box reset under that load:** two undervoltages a few seconds apart while
+the video played, then the log stops with no shutdown and the box boots again (a brownout reset).
+Sessions of the web page live in memory, so the page then said the session had ended. **On a
+laptop's USB-C charger (5 V, 3 A) it held:** 2,036 one-second readings of the undervoltage flag
+over the same kind of load, none set, and no undervoltage in the kernel log. The supply matters
+more with a USB radio and a USB Ethernet adapter on the box; the README should say so.
+
+The driver logs `timed out to flush queues` now and then (five times in 15 minutes, with good
+power and no visible effect on playback), most likely as a client dozes or leaves; noted, not a
+fault.
