@@ -34,7 +34,7 @@ ports.
 - **WHEN** it is loaded
 - **THEN** it is accepted, and `wlan1` is a client of that network, not an access point
 
-#### Scenario: A Wi-Fi inbound client in bridge mode
+#### Scenario: Wi-Fi as a bridge port
 - **GIVEN** a configuration in bridge mode with inbound `wlan1`, a Wi-Fi adapter
 - **WHEN** it is loaded
 - **THEN** it is refused with a message saying a Wi-Fi client cannot be a bridge port, and to use router mode

@@ -62,6 +62,7 @@ understood about the last one, is in the spike's [findings](openspec/changes/arc
 Early. The engine, the endpoint presets, the two modes, the broker, the REST API, a web page, an MCP server for agents and a command line work. What there is:
 
 - the design and the first measurements: [`openspec/changes/archive/2026-10-12-design-the-link-emulator/`](openspec/changes/archive/2026-10-12-design-the-link-emulator/)
+- what it must do, capability by capability: [`openspec/specs/`](openspec/specs/)
 - how the box was built, step by step: [`docs/build-journal.md`](docs/build-journal.md)
 - what is assumed and what is still open: [`docs/open-questions.md`](docs/open-questions.md)
 
