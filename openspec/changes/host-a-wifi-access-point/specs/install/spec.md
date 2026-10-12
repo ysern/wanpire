@@ -2,7 +2,8 @@
 
 ### Requirement: A Wi-Fi adapter's driver is an optional step
 
-The install SHALL install `hostapd` with the box's other packages. When asked with
+The install SHALL install `hostapd` (an access point), `wpasupplicant` and `dhcpcd-base` (a Wi-Fi
+inbound client) with the box's other packages. When asked with
 `--wifi-driver`, and only then, it SHALL build and install, through DKMS, the out-of-tree driver
 for a USB Wi-Fi adapter that the box's kernel does not drive, fetched from the driver's own
 repository and never shipped with wanpire, with the kernel headers, `dkms`, `git` and a compiler

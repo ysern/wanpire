@@ -330,7 +330,8 @@ fi
 
 if [ "$APT" = 1 ]; then
     missing=""
-    for pkg in python3-venv iproute2 nftables dnsmasq-base ethtool iw hostapd; do
+    # hostapd: a Wi-Fi outbound access point; wpasupplicant and dhcpcd-base: a Wi-Fi inbound client
+    for pkg in python3-venv iproute2 nftables dnsmasq-base ethtool iw hostapd wpasupplicant dhcpcd-base; do
         dpkg -s "$pkg" >/dev/null 2>&1 || missing="$missing $pkg"
     done
     if [ -n "$missing" ]; then
@@ -353,7 +354,13 @@ fi
 # The box's own regulatory country, when the option gives none and the box has one set
 if [ -z "$WIFI_COUNTRY" ] && [ "$STAGING" = 0 ] && command -v iw >/dev/null 2>&1; then
     c=$(iw reg get 2>/dev/null | sed -n 's/^country \([A-Z][A-Z]\):.*/\1/p' | head -n 1)
-    [ "$c" = 00 ] || WIFI_COUNTRY=$c
+    # A Pi's built-in radio may show a code of its own ("country 98") as the global domain;
+    # the country the system asked for (netplan's regulatory-domain) is then the kernel's hint.
+    case $c in
+        [A-Z][A-Z]) ;;
+        *) c=$(cat /sys/module/cfg80211/parameters/ieee80211_regdom 2>/dev/null) ;;
+    esac
+    case $c in 00|"") ;; [A-Z][A-Z]) WIFI_COUNTRY=$c ;; esac
 fi
 
 # Written once: afterwards the page changes it (the roles, the access points), and a second

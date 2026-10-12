@@ -6,7 +6,8 @@ except ``load_config``.
       "mode": "bridge",
       "adapters": {"control": "wlan0", "inbound": "eth0", "outbound": ["eth1"]},
       "router": {"address": "10.77.0.1/24"},
-      "access_points": {"wlan1": {"ssid": "<wifi-ssid>", "passphrase": "<wifi-password>"}},
+      "access_points": {"wlan2": {"ssid": "<wifi-ssid>", "passphrase": "<wifi-password>"}},
+      "wifi_clients": {"wlan1": {"ssid": "<network-to-join>", "passphrase": "<its-password>"}},
       "wifi": {"country": "GB"}
     }
 
@@ -14,9 +15,12 @@ Roles: *control* is where the web UI, the REST API and the MCP listen, and is ne
 *inbound* faces the wider network; *outbound* faces the device under test and carries every
 impairment, so it shares its adapter with nothing.
 
-A Wi-Fi adapter in the inbound or the outbound role is an access point: it needs its network
-name and password in ``access_points`` and the regulatory country in ``wifi``. Both keys are
-optional otherwise, so a wired configuration reads as it always did.
+A Wi-Fi adapter's role depends on its side. Outbound, it is an access point that the device
+joins: it needs its network name and password in ``access_points`` and the regulatory country
+in ``wifi``, in either mode. Inbound, it is a client that joins a network of the wider world:
+it needs that network in ``wifi_clients``, and works in router mode only, since a Wi-Fi client
+cannot be a bridge port. The three keys are optional otherwise, so a wired configuration reads
+as it always did.
 """
 
 from __future__ import annotations
@@ -35,6 +39,9 @@ DEFAULT_ROUTER_ADDRESS = "10.77.0.1/24"
 WIRED = ("ethernet", "usb-ethernet")
 SSID_RULE = "a network name has 1 to 32 bytes in UTF-8"
 PASSPHRASE_RULE = "a password has 8 to 63 printable ASCII characters"
+CLIENT_PASSPHRASE_RULE = ("a password has 8 to 63 printable ASCII characters, or 64 hexadecimal "
+                          "digits, or is empty for an open network")
+_HEX64 = re.compile(r"[0-9A-Fa-f]{64}")
 _COUNTRY = re.compile(r"[A-Z]{2}")
 
 
@@ -51,6 +58,7 @@ class Config:
     router_address: str = DEFAULT_ROUTER_ADDRESS
     bridge_name: str = "wpbr0"
     access_points: dict = field(default_factory=dict)  # adapter -> {"ssid", "passphrase"}
+    wifi_clients: dict = field(default_factory=dict)  # adapter -> the network it joins
     country: str | None = None
     wifi_roles: tuple[str, ...] = ()  # the adapters in a line role that are Wi-Fi, when known
 
@@ -65,12 +73,21 @@ class Config:
 
     @property
     def access_point_adapters(self) -> tuple[str, ...]:
-        """The adapters in a line role that run an access point."""
-        return tuple(n for n in (self.inbound, *self.outbound) if n in self.wifi_roles)
+        """The adapters that run an access point: a Wi-Fi outbound one."""
+        return tuple(n for n in self.outbound if n in self.wifi_roles)
+
+    @property
+    def client_adapter(self) -> str | None:
+        """The adapter that joins a network as a Wi-Fi client: a Wi-Fi inbound one."""
+        return self.inbound if self.inbound in self.wifi_roles else None
 
     def access_point(self, adapter: str) -> dict | None:
         ap = self.access_points.get(adapter)
         return dict(ap) if ap else None
+
+    def wifi_client(self, adapter: str) -> dict | None:
+        net = self.wifi_clients.get(adapter)
+        return dict(net) if net else None
 
     def to_dict(self) -> dict:
         d = {"schema": SCHEMA, "mode": self.mode,
@@ -79,6 +96,8 @@ class Config:
              "router": {"address": self.router_address}}
         if self.access_points:
             d["access_points"] = {k: dict(v) for k, v in self.access_points.items()}
+        if self.wifi_clients:
+            d["wifi_clients"] = {k: dict(v) for k, v in self.wifi_clients.items()}
         if self.country:
             d["wifi"] = {"country": self.country}
         return d
@@ -95,6 +114,33 @@ def check_passphrase(passphrase) -> str:
             or any(not 32 <= ord(ch) <= 126 for ch in passphrase)):
         raise InvalidConfig(f"{PASSPHRASE_RULE} (WPA2/WPA3-Personal)")
     return passphrase
+
+
+def check_client_passphrase(passphrase) -> str:
+    """A network to join: WPA2/WPA3-Personal's passphrase, its 64-digit key, or none (open)."""
+    if isinstance(passphrase, str) and (passphrase == "" or _HEX64.fullmatch(passphrase)):
+        return passphrase
+    try:
+        return check_passphrase(passphrase)
+    except InvalidConfig:
+        raise InvalidConfig(CLIENT_PASSPHRASE_RULE) from None
+
+
+def _wifi_clients(data: dict) -> dict:
+    raw = data.get("wifi_clients") or {}
+    if not isinstance(raw, dict):
+        raise InvalidConfig("wifi_clients must map an adapter to the ssid and passphrase of the "
+                            "network it joins")
+    out = {}
+    for name, net in raw.items():
+        if not isinstance(net, dict):
+            raise InvalidConfig(f"wifi_clients.{name} must hold an ssid and a passphrase")
+        try:
+            out[name] = {"ssid": check_ssid(net.get("ssid")),
+                         "passphrase": check_client_passphrase(net.get("passphrase"))}
+        except InvalidConfig as e:
+            raise InvalidConfig(f"the network {name} joins: {e}") from None
+    return out
 
 
 def _access_points(data: dict) -> dict:
@@ -153,10 +199,12 @@ def config_from_dict(data: dict, adapters: dict | None = None) -> Config:
     address = router.get("address", DEFAULT_ROUTER_ADDRESS)
     _check_router_address(address)
     aps = _access_points(data)
+    clients = _wifi_clients(data)
     country = _country(data)
-    if control in aps:
-        raise InvalidConfig(f"{control} is the control adapter, which is never an access point: "
-                            "its own configuration is left alone")
+    if control in aps or control in clients:
+        raise InvalidConfig(f"{control} is the control adapter, which is never an access point "
+                            "nor a client wanpire joins to a network: its own configuration is "
+                            "left alone")
     wifi_roles: tuple[str, ...] = ()
 
     if adapters is not None:
@@ -167,27 +215,33 @@ def config_from_dict(data: dict, adapters: dict | None = None) -> Config:
                     f"{', '.join(sorted(adapters))}"
                 )
         wifi_roles = tuple(n for n in (inbound, out) if adapters[n].kind == "wifi")
-        for name in wifi_roles:
-            if not adapters[name].can_be_ap:
+        if inbound in wifi_roles:
+            if mode == "bridge":
                 raise InvalidConfig(
-                    f"{name} cannot be an access point: its radio does not support AP mode, and "
-                    "a Wi-Fi adapter in a line role is always one"
+                    f"{inbound} is Wi-Fi: a Wi-Fi inbound adapter joins a network as a client, "
+                    "and a Wi-Fi client cannot be a bridge port (the access point it joins "
+                    "drops frames from any address but the client's own); use router mode"
                 )
-        if mode == "router" and inbound in wifi_roles:
-            raise InvalidConfig(
-                f"{inbound} is Wi-Fi: a Wi-Fi inbound adapter is an access point and works in "
-                "bridge mode only (in router mode inbound is a client of the wider network)"
-            )
-        for name in wifi_roles:
-            if name not in aps:
+            if inbound not in clients:
                 raise InvalidConfig(
-                    f"{name} needs a network name and a password: a Wi-Fi adapter in a line "
-                    "role is an access point (access_points)"
+                    f"{inbound} needs the network to join, its name and password: a Wi-Fi "
+                    "inbound adapter is a client of the wider network (wifi_clients)"
                 )
-        if wifi_roles and not country:
-            raise InvalidConfig(
-                "an access point needs the regulatory country: wifi.country, e.g. GB or US"
-            )
+        if out in wifi_roles:
+            if not adapters[out].can_be_ap:
+                raise InvalidConfig(
+                    f"{out} cannot be an access point: its radio does not support AP mode, and "
+                    "a Wi-Fi outbound adapter is always one"
+                )
+            if out not in aps:
+                raise InvalidConfig(
+                    f"{out} needs a network name and a password: a Wi-Fi outbound adapter is "
+                    "an access point (access_points)"
+                )
+            if not country:
+                raise InvalidConfig(
+                    "an access point needs the regulatory country: wifi.country, e.g. GB or US"
+                )
         if mode == "bridge":
             for name in (inbound, out):
                 if adapters[name].kind not in WIRED and name not in wifi_roles:
@@ -199,8 +253,8 @@ def config_from_dict(data: dict, adapters: dict | None = None) -> Config:
             "or router mode"
         )
     return Config(mode=mode, control=control, inbound=inbound, outbound=(out,),
-                  router_address=address, access_points=aps, country=country,
-                  wifi_roles=wifi_roles)
+                  router_address=address, access_points=aps, wifi_clients=clients,
+                  country=country, wifi_roles=wifi_roles)
 
 
 def _check_router_address(address: str) -> None:
@@ -231,7 +285,7 @@ def load_config(path: str = DEFAULT_PATH, adapters: dict | None = None) -> Confi
 
 def save_config(cfg: Config, path: str = DEFAULT_PATH) -> None:
     """Write ``cfg`` to ``path`` in one step (a file beside it, renamed over it), readable and
-    writable by its owner only: it holds the access points' passwords."""
+    writable by its owner only: it holds the Wi-Fi passwords."""
     fd, tmp = tempfile.mkstemp(prefix=".wanpire-", suffix=".json",
                                dir=os.path.dirname(os.path.abspath(path)))
     try:

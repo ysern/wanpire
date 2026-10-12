@@ -1,17 +1,16 @@
 ## Purpose
 
-Lets a wireless device under test join wanpire itself: a Wi-Fi adapter in a line role runs an
-access point, so the device's traffic crosses the box and every impairment applies to it.
+Lets a wireless device under test join wanpire itself: a Wi-Fi outbound adapter runs an access
+point, so the device's traffic crosses the box and every impairment applies to it.
 
 ## ADDED Requirements
 
-### Requirement: A Wi-Fi adapter in a role runs an access point
+### Requirement: A Wi-Fi outbound adapter runs an access point
 
-When the mode is set up, every Wi-Fi adapter in the inbound or the outbound role SHALL run an
-access point through `hostapd`: on 5 GHz, on channel 36 at 80 MHz, with the configured network
+When the mode is set up, a Wi-Fi outbound adapter SHALL run an access point through `hostapd`: on 5 GHz, on channel 36 at 80 MHz, with the configured network
 name and password, WPA2-Personal and WPA3-Personal both accepted, under the configured regulatory
 country. In bridge mode the access point SHALL be a port of the bridge. In router mode the
-outbound access point SHALL carry the router's address and its DHCP server. The access point's
+access point SHALL carry the router's address and its DHCP server. The access point's
 settings SHALL be written to a file in the state directory, readable by root only.
 
 #### Scenario: Bridge mode with an access point

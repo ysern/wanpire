@@ -87,19 +87,9 @@ def test_a_wifi_access_point_as_outbound_in_router_mode():
     assert c.access_point_adapters == ("wlan1",)
 
 
-def test_a_wifi_inbound_access_point_in_bridge_mode():
-    c = config_from_dict(ap_doc(inbound="wlan1", outbound=("eth1",)), AP_BOX)
-    assert c.access_point_adapters == ("wlan1",)
-
-
 def test_a_radio_that_cannot_be_an_access_point_is_refused():
     with pytest.raises(InvalidConfig, match="wlan2 cannot be an access point"):
         config_from_dict(ap_doc(outbound=("wlan2",), aps={"wlan2": AP}), AP_BOX)
-
-
-def test_wifi_inbound_in_router_mode_is_refused():
-    with pytest.raises(InvalidConfig, match="bridge mode only"):
-        config_from_dict(ap_doc(mode="router", inbound="wlan1", outbound=("eth1",)), AP_BOX)
 
 
 def test_a_wifi_outbound_without_its_network_is_refused():
@@ -107,9 +97,79 @@ def test_a_wifi_outbound_without_its_network_is_refused():
         config_from_dict(ap_doc(aps={}), AP_BOX)
 
 
-def test_a_wifi_bridge_port_without_its_network_is_refused():
-    with pytest.raises(InvalidConfig, match="wlan0 needs a network name and a password"):
-        config_from_dict(doc(inbound="wlan0", control="eth1", outbound=("eth0",)), BOX)
+# -- a Wi-Fi inbound adapter is a client of a network (the owner, 2026-10-11) ----------------
+
+NET = {"ssid": "upstream", "passphrase": "correct horse"}
+
+
+def client_doc(mode="router", inbound="wlan1", outbound=("eth1",), nets=None, **over):
+    d = doc(mode=mode, inbound=inbound, outbound=outbound, **over)
+    d["wifi_clients"] = {"wlan1": NET} if nets is None else nets
+    return d
+
+
+def test_a_wifi_inbound_joins_a_network_in_router_mode():
+    c = config_from_dict(client_doc(), AP_BOX)
+    assert c.client_adapter == "wlan1" and c.wifi_client("wlan1") == NET
+    assert c.access_point_adapters == () and c.access_point("wlan1") is None
+    assert c.to_dict()["wifi_clients"] == {"wlan1": NET}
+
+
+def test_a_wifi_inbound_needs_no_country_and_no_ap_mode():
+    c = config_from_dict(client_doc(inbound="wlan2", nets={"wlan2": NET}), AP_BOX)
+    assert c.client_adapter == "wlan2" and c.country is None
+
+
+def test_a_wifi_inbound_in_bridge_mode_is_refused_with_why():
+    with pytest.raises(InvalidConfig, match="a Wi-Fi client cannot be a bridge port.*router mode"):
+        config_from_dict(client_doc(mode="bridge"), AP_BOX)
+
+
+def test_a_wifi_inbound_without_its_network_is_refused():
+    with pytest.raises(InvalidConfig, match="wlan1 needs the network to join"):
+        config_from_dict(client_doc(nets={}), AP_BOX)
+
+
+def test_an_access_point_for_the_inbound_adapter_does_not_count_as_its_network():
+    d = client_doc(nets={})
+    d["access_points"] = {"wlan1": AP}
+    with pytest.raises(InvalidConfig, match="wlan1 needs the network to join"):
+        config_from_dict(d, AP_BOX)
+
+
+@pytest.mark.parametrize("passphrase", ["", "eight888", "x" * 63, "ab" * 32])
+def test_a_client_password_inside_the_rules(passphrase):
+    net = {"ssid": "upstream", "passphrase": passphrase}
+    c = config_from_dict(client_doc(nets={"wlan1": net}), AP_BOX)
+    assert c.wifi_client("wlan1") == net
+
+
+@pytest.mark.parametrize("passphrase", ["seven77", "x" * 64, "ab" * 32 + "a", "g" * 64,
+                                        "café-latte", None])
+def test_a_client_password_outside_the_rules_is_refused(passphrase):
+    with pytest.raises(InvalidConfig, match="8 to 63 printable ASCII.*64 hexadecimal.*empty"):
+        config_from_dict(client_doc(nets={"wlan1": {"ssid": "up", "passphrase": passphrase}}),
+                         AP_BOX)
+
+
+@pytest.mark.parametrize("ssid", ["", "x" * 33])
+def test_a_client_network_name_outside_the_rules_is_refused(ssid):
+    with pytest.raises(InvalidConfig, match="1 to 32 bytes"):
+        config_from_dict(client_doc(nets={"wlan1": {"ssid": ssid, "passphrase": ""}}), AP_BOX)
+
+
+def test_the_control_adapter_never_joins_a_network_here():
+    with pytest.raises(InvalidConfig, match="control"):
+        config_from_dict(doc(mode="router", control="wlan1", inbound="eth0", outbound=("eth1",),
+                             wifi_clients={"wlan1": NET}), AP_BOX)
+
+
+def test_a_wifi_client_inbound_and_an_access_point_outbound_in_router_mode():
+    d = client_doc(outbound=("wlan2",), nets={"wlan1": NET})
+    box = dict(AP_BOX, wlan2=adapter("wlan2", "wifi"))
+    d["access_points"], d["wifi"] = {"wlan2": AP}, WIFI
+    c = config_from_dict(d, box)
+    assert c.client_adapter == "wlan1" and c.access_point_adapters == ("wlan2",)
 
 
 @pytest.mark.parametrize("passphrase", ["seven77", "x" * 64, "tab\there!", "café-latte"])
@@ -156,6 +216,7 @@ def test_the_control_adapter_is_never_an_access_point():
 def test_a_wired_configuration_needs_no_wifi_settings():
     c = config_from_dict(doc(), AP_BOX)
     assert c.access_point_adapters == () and c.country is None
+    assert c.client_adapter is None and "wifi_clients" not in c.to_dict()
 
 
 def test_settings_for_an_adapter_in_no_role_are_kept_but_unused():

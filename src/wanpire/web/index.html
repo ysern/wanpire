@@ -210,23 +210,25 @@
       <div class="page" id="page-adapters-list" hidden>
         <section class="panel">
           <div class="head"><h2>Roles</h2></div>
-          <p class="desc">The two adapters the line runs through. A Wi-Fi adapter becomes an access point that the device joins, on 5 GHz with WPA2 or WPA3. The roles change only with no link applied and no lease held.</p>
+          <p class="desc">The two adapters the line runs through. A Wi-Fi outbound adapter becomes an access point that the device joins, on 5 GHz with WPA2 or WPA3; a Wi-Fi inbound adapter joins a network as a client, in router mode. The roles change only with no link applied and no lease held.</p>
           <form id="roles-form" class="form" novalidate>
             <label for="role-inbound">Inbound adapter:</label>
             <div class="control">
               <select id="role-inbound"></select>
               <p class="help">Faces the wider network.</p>
             </div>
-            <div id="ap-inbound" class="ap-fields" hidden>
-              <label for="ap-inbound-ssid">Network name:</label>
+            <div id="net-inbound" class="ap-fields" hidden>
+              <label for="net-inbound-ssid">Network to join:</label>
               <div class="control">
-                <input id="ap-inbound-ssid" type="text" autocomplete="off" spellcheck="false">
-                <p id="ap-inbound-ssid-error" class="help bad" role="alert"></p>
+                <input id="net-inbound-ssid" type="text" autocomplete="off" spellcheck="false">
+                <p class="help">A Wi-Fi inbound adapter joins this network as a client, in router mode.</p>
+                <p id="net-inbound-ssid-error" class="help bad" role="alert"></p>
               </div>
-              <label for="ap-inbound-pass">Password:</label>
+              <label for="net-inbound-pass">Password:</label>
               <div class="control">
-                <input id="ap-inbound-pass" type="text" autocomplete="off" spellcheck="false">
-                <p id="ap-inbound-pass-error" class="help bad" role="alert"></p>
+                <input id="net-inbound-pass" type="text" autocomplete="off" spellcheck="false">
+                <p class="help">WPA2 or WPA3; leave it empty for an open network.</p>
+                <p id="net-inbound-pass-error" class="help bad" role="alert"></p>
               </div>
             </div>
             <label for="role-outbound">Outbound adapter:</label>

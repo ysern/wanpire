@@ -101,3 +101,84 @@ def test_an_access_point_that_does_not_come_up_fails_the_set_up(tmp_path):
     ipr = FakeIPR(["eth0", "wlan0", "wlan1"])
     with pytest.raises(ModeRefused, match="no channel"):
         modes(tmp_path, ipr, FakeAP(fail=True)).up(cfg("bridge"))
+
+
+# -- a Wi-Fi inbound adapter joins a network as a client, in router mode ----------------------
+
+NET = {"ssid": "upstream", "passphrase": ""}
+
+
+class FakeClient:
+    def __init__(self, fail=False, gateway="192.0.2.1"):
+        self.started, self.stopped, self.fail, self.gw = [], [], fail, gateway
+
+    def start(self, adapter, net, country):
+        if self.fail:
+            from wanpire.wifi_client import WifiClientFailed
+            raise WifiClientFailed(f"{adapter} did not join {net['ssid']}: wrong key")
+        self.started.append((adapter, net["ssid"]))
+
+    def gateway(self, adapter):
+        return self.gw
+
+    def stop(self, adapter):
+        self.stopped.append(adapter)
+
+
+def client_modes(tmp_path, ipr, wifi_client, runner=None):
+    calls = []
+    m = Modes(state_dir=str(tmp_path), runner=runner or (
+        lambda argv, check=True: calls.append(list(argv)) or "0\n"),
+        access_point=FakeAP(), wifi_client=wifi_client)
+    m._ipr = lambda: ipr
+    m._nft_up = lambda c: None
+    m._dhcp_up = lambda c: None
+    m.calls = calls
+    return m
+
+
+def client_cfg():
+    return Config(mode="router", control="wlan0", inbound="wlan1", outbound=("eth1",),
+                  wifi_clients={"wlan1": NET}, wifi_roles=("wlan1",))
+
+
+def test_router_mode_joins_the_network_and_routes_the_line_out_through_it(tmp_path):
+    wc = FakeClient()
+    m = client_modes(tmp_path, FakeIPR(["eth1", "wlan0", "wlan1"]), wc)
+    m.up(client_cfg())
+    assert wc.started == [("wlan1", "upstream")]
+    assert ["ip", "-4", "route", "replace", "default", "via", "192.0.2.1", "dev", "wlan1",
+            "table", "4077"] in m.calls
+    assert ["ip", "-4", "rule", "add", "iif", "eth1", "lookup", "4077", "priority",
+            "4077"] in m.calls
+    for call in m.calls:
+        assert "wlan0" not in call
+
+
+def test_a_network_not_joined_fails_the_set_up(tmp_path):
+    m = client_modes(tmp_path, FakeIPR(["eth1", "wlan0", "wlan1"]), FakeClient(fail=True))
+    with pytest.raises(ModeRefused, match="wlan1 did not join upstream"):
+        m.up(client_cfg())
+
+
+def test_no_gateway_fails_the_set_up(tmp_path):
+    m = client_modes(tmp_path, FakeIPR(["eth1", "wlan0", "wlan1"]), FakeClient(gateway=None))
+    with pytest.raises(ModeRefused, match="no gateway"):
+        m.up(client_cfg())
+
+
+def test_down_leaves_the_network_and_removes_the_route(tmp_path):
+    wc = FakeClient()
+    m = client_modes(tmp_path, FakeIPR(["eth1", "wlan0", "wlan1"]), wc)
+    m.down(client_cfg())
+    m.down(client_cfg())
+    assert wc.stopped == ["wlan1", "wlan1"] and "wlan0" not in wc.stopped
+    assert ["ip", "-4", "rule", "del", "priority", "4077"] in m.calls
+    assert ["ip", "-4", "route", "flush", "table", "4077"] in m.calls
+
+
+def test_a_wired_router_line_joins_nothing(tmp_path):
+    wc = FakeClient()
+    m = client_modes(tmp_path, FakeIPR(["eth0", "eth1", "wlan0"]), wc)
+    m.up(Config(mode="router", control="wlan0", inbound="eth0", outbound=("eth1",)))
+    assert wc.started == [] and not [c for c in m.calls if "rule" in c]

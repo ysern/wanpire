@@ -190,3 +190,55 @@ def test_other_access_points_are_kept(tmp_path):
                   path=str(tmp_path / "w.json"))
     new = roles.change("eth1", "eth0", {})
     assert new.access_points == {"wlan1": AP}
+
+
+# -- a Wi-Fi inbound adapter joins a network as a client (the owner, 2026-10-11) -------------
+
+NET = {"ssid": "upstream", "passphrase": ""}
+
+
+def test_reading_the_roles_names_no_network_to_join(tmp_path, roles):
+    got = box(tmp_path, roles).get("/api/v1/roles", headers=AUTH).json()
+    assert got["wifi_clients"] == {}
+
+
+def test_a_wifi_inbound_in_bridge_mode_is_refused_with_why(tmp_path, roles):
+    r = box(tmp_path, roles).put("/api/v1/roles", headers=AUTH, json={
+        "inbound": "wlan1", "outbound": "eth1", "wifi_clients": {"wlan1": NET}})
+    assert r.status_code == 422
+    assert "cannot be a bridge port" in r.json()["error"] and "router mode" in r.json()["error"]
+    assert roles.modes.calls == [] and not roles.path_obj.exists()
+
+
+@pytest.fixture
+def router_roles(tmp_path):
+    cfg = config_from_dict(dict(DOC, mode="router"), BY_NAME)
+    r = Roles(cfg, list_adapters=lambda: ADAPTERS, modes=RecordingModes(),
+              path=str(tmp_path / "wanpire.json"))
+    r.path_obj = tmp_path / "wanpire.json"
+    return r
+
+
+def test_a_wifi_inbound_joins_a_network_in_router_mode(tmp_path, router_roles):
+    r = box(tmp_path, router_roles).put("/api/v1/roles", headers=AUTH, json={
+        "inbound": "wlan1", "outbound": "eth1", "wifi_clients": {"wlan1": NET},
+        "access_points": {"wlan1": AP}})
+    assert r.status_code == 200, r.text
+    assert r.json()["inbound"] == "wlan1" and r.json()["wifi_clients"] == {"wlan1": NET}
+    assert r.json()["access_points"] == {}  # an access point is only ever an outbound one
+    saved = load_config(str(router_roles.path_obj), BY_NAME)
+    assert saved.client_adapter == "wlan1" and saved.wifi_client("wlan1") == NET
+    assert router_roles.modes.calls == [("down", "eth0", "eth1"), ("up", "wlan1", "eth1")]
+
+
+def test_a_bad_client_password_is_refused(tmp_path, router_roles):
+    r = box(tmp_path, router_roles).put("/api/v1/roles", headers=AUTH, json={
+        "inbound": "wlan1", "outbound": "eth1",
+        "wifi_clients": {"wlan1": {"ssid": "upstream", "passphrase": "short"}}})
+    assert r.status_code == 422 and "64 hexadecimal" in r.json()["error"]
+
+
+def test_wifi_clients_must_be_a_mapping(tmp_path, router_roles):
+    r = box(tmp_path, router_roles).put("/api/v1/roles", headers=AUTH, json={
+        "inbound": "wlan1", "outbound": "eth1", "wifi_clients": ["wlan1"]})
+    assert r.status_code == 422 and "wifi_clients" in r.json()["error"]

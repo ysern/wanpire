@@ -805,3 +805,34 @@ up again with the new roles, without a restart, so nobody is signed out; it refu
 someone holds the link, and puts the old roles back if the new ones do not come up. The access
 point is `hostapd`, on 5 GHz channel 36, WPA2 and WPA3 both accepted. The network name goes to
 `hostapd` in hexadecimal, so a quote or a line break in it cannot become a setting of its own.
+
+## 2026-10-12 — The stick works, and learns which way it faces
+
+The owner switched the Pi off and on again, and the driver was built a second time, now with one
+compiler and, as a guard, a temporary swap file on the SD card. Ten minutes, never short of
+memory, SSH answering all along; the swap was barely touched and is gone again. The first build
+had not failed for want of anything but restraint.
+
+The adapter then did what was asked of it. wanpire's own access-point code put it on channel 36
+at 80 MHz with WPA2 and WPA3, the Pi's built-in radio saw the beacon, and it stayed up for an
+hour, checked every minute, without a word from the driver. The only kernel messages were the
+Pi's: twice, a brief undervoltage. Two USB adapters draw on one small supply, and that is worth
+a better supply before anyone measures throughput.
+
+Meanwhile the owner changed what a Wi-Fi adapter is for. Picked as outbound, it is the access
+point the device joins, in either mode. Picked as inbound, it is an ordinary Wi-Fi client of the
+network named under the drop-down, so the box itself can reach the world without a cable, in
+router mode only. A Wi-Fi client cannot be a bridge port: the access point it joins drops frames
+from any address but the client's own. The ways around that (a four-address link that only some
+access points accept, or proxy ARP with a DHCP relay that loses broadcast, multicast and IPv6)
+were set aside; the owner confirmed it.
+
+The client's hard part was not joining but keeping out of the way. On the bench it joins the same
+network the box is controlled over, so its default route must lose to the control adapter's, it
+must not answer ARP for the control adapter's address (or the network would learn that address
+at the wrong card, and the session would break the moment the client left), it must not pick up
+IPv6 from a router advertisement, and no DHCP hook may rewrite the name servers. wanpire runs
+`wpa_supplicant` and `dhcpcd` itself, for that one adapter, and routes the line's traffic out
+through it by a table of its own. On the Pi it joined in eighteen seconds at Wi-Fi 6 rates,
+pinged its gateway, and left again, while the SSH session over the built-in radio carried on as
+if nothing had happened. A timer had been set to switch the adapter off had it not.

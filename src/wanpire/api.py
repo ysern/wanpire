@@ -23,8 +23,9 @@ broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ti
     GET    /api/v1/endpoints/{id}    one preset document
     POST   /api/v1/preview           {"near", "far"} -> the link and how it was worked out
     GET    /api/v1/adapters          every adapter, its facts and its role
-    GET    /api/v1/roles             inbound, outbound, their access points, what may be picked
-    PUT    /api/v1/roles             {"inbound", "outbound", "access_points"}: set them (idle line)
+    GET    /api/v1/roles             inbound, outbound, their Wi-Fi networks, what may be picked
+    PUT    /api/v1/roles             {"inbound", "outbound", "access_points", "wifi_clients"}:
+                                     set them (idle line)
     POST   /mcp                      the MCP (streamable HTTP), its tools calling the routes above
 
 The web UI's static files are served at ``/`` without credentials: they hold no data, and the
@@ -391,12 +392,17 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
         aps = body.get("access_points") or {}
         if not isinstance(aps, dict):
             raise _Status(422, "access_points must map an adapter to its ssid and passphrase")
+        clients = body.get("wifi_clients") or {}
+        if not isinstance(clients, dict):
+            raise _Status(422, "wifi_clients must map an adapter to the ssid and passphrase of "
+                               "the network it joins")
         link = engine.read(outbound_now())
         if (link["down"].get("applied") or link["up"].get("applied")
                 or broker.status()["holder"] is not None):
             raise _Status(409, "the roles change only with no link applied and no lease held: "
                                "clear the link and release the lease first")
-        roles.change(str(body.get("inbound") or ""), str(body.get("outbound") or ""), aps)
+        roles.change(str(body.get("inbound") or ""), str(body.get("outbound") or ""), aps,
+                     clients)
         described[0] = None
         return roles.view()
 

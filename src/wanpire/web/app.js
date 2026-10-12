@@ -138,11 +138,15 @@ async function loadAdapters() {
     a.name, a.kind, a.role || "none", a.state || "-", a.speed_mbit ? `${a.speed_mbit} Mbit/s` : "-"]));
 }
 
-// -- the roles: inbound and outbound, an access point beside a Wi-Fi one ---------------------
+// -- the roles: inbound and outbound; a Wi-Fi inbound joins a network, a Wi-Fi outbound is an
+// access point ----------------------------------------------------------------------------------
 
 const ROLES = ["inbound", "outbound"];
+// the fields beside a Wi-Fi adapter: the network to join inbound, the access point outbound
+const FIELDS = { inbound: "net-inbound", outbound: "ap-outbound" };
 let offered = []; // the adapters the box lets be picked, with their kind
-let accessPoints = {}; // the access points the box has, by adapter
+let networks = { inbound: {}, outbound: {} }; // what the box has, by role then adapter
+let mode = "bridge";
 
 const isWifi = (name) => (offered.find((a) => a.name === name) || {}).kind === "wifi";
 
@@ -157,36 +161,43 @@ function passProblem(pass) {
     : "A password has 8 to 63 printable ASCII characters.";
 }
 
-function showAccessPoint(role) {
+function joinPassProblem(pass) {
+  return pass === "" || /^[0-9A-Fa-f]{64}$/.test(pass) || !passProblem(pass) ? ""
+    : "A password has 8 to 63 printable ASCII characters, or 64 hexadecimal digits, or is empty for an open network.";
+}
+
+function showWifiFields(role) {
   const name = $(`role-${role}`).value;
   const wifi = isWifi(name);
-  $(`ap-${role}`).hidden = !wifi;
+  const f = FIELDS[role];
+  $(f).hidden = !wifi;
   if (wifi) {
-    const ap = accessPoints[name] || { ssid: "", passphrase: "" };
-    $(`ap-${role}-ssid`).value = ap.ssid;
-    $(`ap-${role}-pass`).value = ap.passphrase;
+    const net = networks[role][name] || { ssid: "", passphrase: "" };
+    $(`${f}-ssid`).value = net.ssid;
+    $(`${f}-pass`).value = net.passphrase;
   }
-  $(`ap-${role}-ssid-error`).textContent = "";
-  $(`ap-${role}-pass-error`).textContent = "";
+  $(`${f}-ssid-error`).textContent = "";
+  $(`${f}-pass-error`).textContent = "";
 }
 
 async function loadRoles() {
   const res = await call("GET", "roles");
   if (!res.ok) return;
   offered = res.data.offered;
-  accessPoints = res.data.access_points || {};
+  mode = res.data.mode;
+  networks = { inbound: res.data.wifi_clients || {}, outbound: res.data.access_points || {} };
   for (const role of ROLES) {
     const sel = $(`role-${role}`);
     sel.replaceChildren(...offered.map((a) => option(a.name, `${a.name} (${a.kind})`)));
     sel.value = res.data[role];
-    showAccessPoint(role);
+    showWifiFields(role);
   }
 }
 
 for (const role of ROLES) {
   $(`role-${role}`).addEventListener("change", () => {
     $("role-error").textContent = "";
-    showAccessPoint(role);
+    showWifiFields(role);
   });
 }
 
@@ -196,22 +207,27 @@ $("roles-form").addEventListener("submit", async (ev) => {
   m.textContent = "";
   m.className = "help";
   const body = { inbound: $("role-inbound").value, outbound: $("role-outbound").value,
-    access_points: {} };
-  let wrong = false;
-  $("role-error").textContent = "";
+    access_points: {}, wifi_clients: {} };
+  const problems = [];
   if (body.inbound === body.outbound) {
-    $("role-error").textContent = "Inbound and outbound must differ: pick two adapters.";
-    wrong = true;
+    problems.push("Inbound and outbound must differ: pick two adapters.");
   }
+  if (isWifi(body.inbound) && mode === "bridge") {
+    problems.push("A Wi-Fi inbound adapter joins a network as a client, which cannot be a bridge port: it works in router mode only.");
+  }
+  $("role-error").textContent = problems.join(" ");
+  let wrong = problems.length > 0;
   for (const role of ROLES) {
     const name = body[role];
     if (!isWifi(name)) continue;
-    const ssid = $(`ap-${role}-ssid`).value;
-    const passphrase = $(`ap-${role}-pass`).value;
-    $(`ap-${role}-ssid-error`).textContent = ssidProblem(ssid);
-    $(`ap-${role}-pass-error`).textContent = passProblem(passphrase);
-    if (ssidProblem(ssid) || passProblem(passphrase)) wrong = true;
-    body.access_points[name] = { ssid, passphrase };
+    const f = FIELDS[role];
+    const ssid = $(`${f}-ssid`).value;
+    const passphrase = $(`${f}-pass`).value;
+    const pass = role === "inbound" ? joinPassProblem(passphrase) : passProblem(passphrase);
+    $(`${f}-ssid-error`).textContent = ssidProblem(ssid);
+    $(`${f}-pass-error`).textContent = pass;
+    if (ssidProblem(ssid) || pass) wrong = true;
+    body[role === "inbound" ? "wifi_clients" : "access_points"][name] = { ssid, passphrase };
   }
   if (wrong) return;
   $("roles-save").disabled = true;

@@ -50,12 +50,9 @@ def fake_usb(base: Path, devices: dict[str, tuple[str, str, str, bool]]) -> Path
     for name, (vendor, product_id, product, driven) in devices.items():
         d = usb / name
         (d / f"{name}:1.0").mkdir(parents=True)
-        (d / "idVendor").write_text(vendor + "
-")
-        (d / "idProduct").write_text(product_id + "
-")
-        (d / "product").write_text(product + "
-")
+        (d / "idVendor").write_text(f"{vendor}\n")
+        (d / "idProduct").write_text(f"{product_id}\n")
+        (d / "product").write_text(f"{product}\n")
         if driven:
             (d / f"{name}:1.0" / "driver").symlink_to(base)
     return usb

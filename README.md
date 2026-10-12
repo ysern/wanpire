@@ -93,16 +93,24 @@ sudo .venv/bin/wanpire down         # and take it off again
 
 ### A Wi-Fi device under test
 
-A Wi-Fi adapter picked as inbound or outbound becomes an access point that the device joins
-(`hostapd`, 5 GHz channel 36, WPA2 and WPA3), in either mode. Pick it on the web page's
-Adapters / Roles page, with the network's name and password, or in the configuration:
+A Wi-Fi adapter picked as **outbound** becomes an access point that the device joins
+(`hostapd`, 5 GHz channel 36, WPA2 and WPA3), in either mode. A Wi-Fi adapter picked as
+**inbound** joins a network as an ordinary Wi-Fi client (WPA2, WPA3 or open; `wpa_supplicant`
+and `dhcpcd` for that adapter only), in router mode only: a Wi-Fi client cannot be a bridge
+port. Pick them on the web page's Adapters / Roles page, with the network's name and password
+under each, or in the configuration:
 
 ```json
-{"schema": "wanpire-config/1", "mode": "bridge",
- "adapters": {"control": "wlan0", "inbound": "eth0", "outbound": ["wlan1"]},
- "access_points": {"wlan1": {"ssid": "<wifi-ssid>", "passphrase": "<wifi-password>"}},
+{"schema": "wanpire-config/1", "mode": "router",
+ "adapters": {"control": "wlan0", "inbound": "wlan1", "outbound": ["wlan2"]},
+ "wifi_clients": {"wlan1": {"ssid": "<network-to-join>", "passphrase": "<its-password>"}},
+ "access_points": {"wlan2": {"ssid": "<wifi-ssid>", "passphrase": "<wifi-password>"}},
  "wifi": {"country": "<two-letter country code>"}}
 ```
+
+The client keeps the box's own traffic on the control adapter even on the same network: a high
+route metric, ARP for its own addresses only, no IPv6, no change to the name servers; the line's
+traffic leaves through it by a routing table of its own.
 
 The box's own Wi-Fi stays its control channel and is never offered. A USB adapter whose kernel
 has no driver for it is named by the install; `install.sh --wifi-driver` builds the out-of-tree
@@ -114,7 +122,7 @@ Adapters tried as access points on the reference build:
 
 | Adapter | Chip | Driver | Access point |
 |---|---|---|---|
-| TP-Link Archer TX20U Plus (USB `2357:013f`) | RTL8832AU | rtw89 backport, DKMS | being tried |
+| TP-Link Archer TX20U Plus (USB `2357:013f`) | RTL8832AU | rtw89 backport, DKMS (commit `8bbbaca`, kernel 6.8.0-raspi) | yes: 5 GHz ch 36 at 80 MHz, WPA2+WPA3, up an hour with no client; as a client it joined a WPA2 network at Wi-Fi 6 rates. A device's figures through it not yet measured |
 
 Adapters whose driver is in the kernel and known to do AP mode, if you are buying one: MediaTek
 MT7612U and MT7921AU based ones (`mt76`).

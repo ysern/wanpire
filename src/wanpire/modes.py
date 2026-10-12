@@ -6,6 +6,10 @@
 - **Router with NAT:** outbound gets an address on a private network of its own and a DHCP
   server (dnsmasq, bound to outbound only); an nftables table of wanpire's own forwards
   outbound's traffic and masquerades it out of inbound; IPv4 forwarding is switched on.
+  A Wi-Fi inbound adapter first joins its network as a client (``wifi_client``), and the
+  outbound's traffic is routed out through it by a rule of its own (table and priority
+  ``ROUTE_TABLE``), since the box's own default route stays on the control adapter.
+- **A Wi-Fi outbound adapter** runs an access point in either mode (``access_point``).
 
 Links, addresses and the bridge go through pyroute2; the ruleset through ``nft -f``, which
 takes a readable file; DHCP through dnsmasq with its whole configuration on the command line.
@@ -25,9 +29,11 @@ import time
 from .access_point import AccessPoint, AccessPointFailed
 from .config import Config
 from .engine import CommandFailed, run
+from .wifi_client import WifiClient, WifiClientFailed
 
 NFT_TABLE = "wanpire"
 DEFAULT_STATE_DIR = "/run/wanpire"
+ROUTE_TABLE = "4077"  # the line's own routing table, and its rule's priority
 
 
 class ModeRefused(RuntimeError):
@@ -43,11 +49,12 @@ def _attr(msg, name):
 
 class Modes:
     def __init__(self, netns: str | None = None, state_dir: str = DEFAULT_STATE_DIR,
-                 runner=None, access_point=None):
+                 runner=None, access_point=None, wifi_client=None):
         self.netns = netns
         self.state_dir = state_dir
         self._run = runner or (lambda argv, check=True: run(argv, check=check, netns=netns))
         self._ap = access_point or AccessPoint(state_dir=state_dir, runner=self._run)
+        self._client = wifi_client or WifiClient(state_dir=state_dir, runner=self._run)
 
     # -- public ---------------------------------------------------------------------------
 
@@ -57,7 +64,7 @@ class Modes:
                 self._bridge_up(cfg)
             else:
                 self._router_up(cfg)
-        except AccessPointFailed as e:
+        except (AccessPointFailed, WifiClientFailed) as e:
             raise ModeRefused(str(e)) from None
 
     def down(self, cfg: Config) -> None:
@@ -66,6 +73,7 @@ class Modes:
             self._ap.stop(name)
         self._bridge_down(cfg)
         self._router_down(cfg)
+        self._client.stop(cfg.inbound)  # only if wanpire joined it to a network
 
     def _start_access_points(self, cfg: Config, bridge: str | None) -> None:
         for name in cfg.access_point_adapters:
@@ -144,6 +152,14 @@ class Modes:
         with self._ipr() as ipr:
             self._require(ipr, cfg.inbound, "inbound")
             self._require(ipr, out, "outbound")
+        gateway = None
+        if cfg.client_adapter:
+            self._client.start(cfg.client_adapter, cfg.wifi_client(cfg.client_adapter),
+                               cfg.country)
+            gateway = self._client.gateway(cfg.client_adapter)
+            if not gateway:
+                raise ModeRefused(f"{cfg.client_adapter} joined its network but was given no "
+                                  "gateway: the line has no way out")
         self._start_access_points(cfg, bridge=None)  # first: hostapd makes it an AP interface
         with self._ipr() as ipr:
             idx = self._require(ipr, out, "outbound")
@@ -154,13 +170,26 @@ class Modes:
             ipr.link("set", index=idx, state="up")
         os.makedirs(self.state_dir, exist_ok=True)
         self._forwarding_on()
+        if gateway:
+            self._line_route_up(cfg.client_adapter, out, gateway)
         self._nft_up(cfg)
         self._dhcp_up(cfg)
+
+    def _line_route_up(self, inbound: str, out: str, gateway: str) -> None:
+        """The outbound's traffic leaves through the Wi-Fi inbound adapter, whatever the box's
+        own default route: a table of the line's own, looked up for what comes in on outbound."""
+        self._run(["ip", "-4", "route", "replace", "default", "via", gateway, "dev", inbound,
+                   "table", ROUTE_TABLE])
+        self._run(["ip", "-4", "rule", "del", "priority", ROUTE_TABLE], check=False)
+        self._run(["ip", "-4", "rule", "add", "iif", out, "lookup", ROUTE_TABLE, "priority",
+                   ROUTE_TABLE])
 
     def _router_down(self, cfg: Config) -> None:
         out = cfg.outbound[0]
         self._dhcp_down(out)
         self._run(["nft", "delete", "table", "inet", NFT_TABLE], check=False)
+        self._run(["ip", "-4", "rule", "del", "priority", ROUTE_TABLE], check=False)
+        self._run(["ip", "-4", "route", "flush", "table", ROUTE_TABLE], check=False)
         iface = ipaddress.ip_interface(cfg.router_address)
         with self._ipr() as ipr:
             idx = self._index(ipr, out)

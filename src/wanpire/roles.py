@@ -1,5 +1,5 @@
-"""The line's roles while the server runs: which adapter is inbound and which outbound, and the
-access point of each Wi-Fi one. Changing them takes the mode down, writes the configuration
+"""The line's roles while the server runs: which adapter is inbound and which outbound, the
+network a Wi-Fi inbound one joins and the access point a Wi-Fi outbound one runs. Changing them takes the mode down, writes the configuration
 and sets the mode up again; if that fails, the old roles are put back.
 
 The control adapter and the mode are not changed here: the control adapter carries the very
@@ -38,15 +38,18 @@ class Roles:
         return {
             "mode": c.mode, "control": c.control, "inbound": c.inbound,
             "outbound": c.outbound[0],
-            "access_points": {n: c.access_point(n) for n in (c.inbound, c.outbound[0])
-                              if c.access_point(n)},
+            "access_points": {n: c.access_point(n) for n in c.access_point_adapters},
+            "wifi_clients": ({c.client_adapter: c.wifi_client(c.client_adapter)}
+                             if c.client_adapter else {}),
             "country": c.country,
             "offered": [{"name": a.name, "kind": a.kind, "can_be_ap": a.can_be_ap}
                         for a in adapters if a.name in offered],
         }
 
-    def change(self, inbound: str, outbound: str, access_points: dict | None) -> Config:
-        """Validate the new roles, then set the mode up again with them."""
+    def change(self, inbound: str, outbound: str, access_points: dict | None,
+               wifi_clients: dict | None = None) -> Config:
+        """Validate the new roles, then set the mode up again with them. An access point is
+        taken for the outbound adapter only, a network to join for the inbound one only."""
         if not inbound or not outbound:
             raise InvalidConfig("the roles need an inbound and an outbound adapter")
         if inbound == outbound:
@@ -63,12 +66,14 @@ class Roles:
             doc = old.to_dict()
             doc["adapters"] = {"control": old.control, "inbound": inbound,
                                "outbound": [outbound]}
-            aps = dict(doc.get("access_points") or {})
-            for name, ap in (access_points or {}).items():
-                if name in (inbound, outbound):
-                    aps[name] = {"ssid": (ap or {}).get("ssid"),
-                                 "passphrase": (ap or {}).get("passphrase")}
-            doc["access_points"] = aps
+            for key, given, side in (("access_points", access_points, outbound),
+                                     ("wifi_clients", wifi_clients, inbound)):
+                kept = dict(doc.get(key) or {})
+                net = (given or {}).get(side)
+                if net is not None:
+                    net = net if isinstance(net, dict) else {}
+                    kept[side] = {"ssid": net.get("ssid"), "passphrase": net.get("passphrase")}
+                doc[key] = kept
             new = config_from_dict(doc, adapters)
             if self.modes is None or self.path is None:
                 raise RuntimeError("the roles cannot be changed here: no mode or file to set")

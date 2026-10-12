@@ -1,7 +1,8 @@
 # Spike: the USB Wi-Fi adapter as an access point
 
-**Status:** blocked, 2026-10-11: the box stopped answering while it built the driver, and waits
-for the owner to power-cycle it (`docs/open-questions.md`, O6). Neither passed nor failed.
+**Status:** passed, 2026-10-12. The driver builds and loads, the adapter runs a 5 GHz WPA2/WPA3
+access point that stayed up for an hour with no client, and joins a network as a client. What
+needs a Wi-Fi device on the other side is the owner's (`docs/open-questions.md`, O7).
 
 ## Question
 
@@ -46,8 +47,23 @@ recommends a MediaTek MT7612U or MT7921AU adapter (in-kernel `mt76`, AP mode pro
   answering within two minutes and had not come back 100 minutes later (ping still answered).
   The install builds with one compiler on a small box, also for DKMS's rebuild after a kernel
   update (`/etc/dkms/rtw89.conf`).
-- Not yet known: whether the module builds and loads, AP mode, the access point's stability, and
-  anything a client must measure (O6, O7).
+- **After the owner's power cycle, it built with one compiler in about ten minutes**, with a
+  temporary 2 GB swap file on the SD card as a guard (barely touched: 1 MB at most; the box
+  kept 400 MB or more available), removed afterwards. SSH answered throughout.
+- **The module loads and the adapter works:** `rtw89_8852au_git` takes firmware 0.13.36.2 and
+  switches the adapter from its USB 2 to its USB 3 identity; on the Pi's USB 2 port it stays at
+  480 Mbit/s (O8). The interface lists AP mode and 5 GHz channels 36 to 48 at 23 dBm.
+- **The access point, started by wanpire's own `access_point.py`,** came up on channel 36 at
+  80 MHz (centre 42) after hostapd's 40 MHz neighbour scan, and was seen from the box's built-in
+  radio as `[WPA2-PSK+SAE-CCMP][ESS][UTF-8]` at -20 dBm.
+- **It stayed up for an hour with no client**, checked every minute: hostapd alive, interface
+  up, channel and width unchanged, nothing from the driver in the kernel log. The one kernel
+  message was the Pi's own undervoltage warning, gone in two seconds (O10).
+- **It shares the control link's 80 MHz block** on the reference box (the control network is on
+  channel 40): both work, taking turns on the air.
+- **The country:** the Pi's built-in radio reports a code of its own ("98") as the global
+  regulatory domain; the country the system asked for is in the kernel's `ieee80211_regdom`, and
+  the install now reads it from there when `iw reg get` names none.
 
 ## Findings in full
 
@@ -85,3 +101,40 @@ Consequences for the change: the install's driver step runs the build with one c
 with less than 3 GB (`NPROC=1`, which the Makefile takes from the environment), and says so. A
 temporary swap file during the build is the other remedy (not taken: it writes a gigabyte to the
 SD card).
+
+### The build, again, with one compiler
+
+`dkms remove rtw89/7.3 --all`, then `dkms install` run detached (`systemd-run`) with
+`NPROC=1` and the same override the install writes to `/etc/dkms/rtw89.conf`. One `cc1` at a
+time; every two minutes the box had 400 to 560 MB available and used at most 1 MB of the
+temporary swap. All modules (the USB and the PCIe ones, since the Pi's kernel has PCI) built
+and installed in about ten minutes. The firmware from the backport (`make install_fw`, which
+compresses it to match the box's) and its `modprobe.d` file followed, as the install does them.
+The swap file was a guard, not a need, once the build ran one compiler; the install does not
+add one.
+
+### The access point
+
+wanpire's `AccessPoint` wrote the settings and started `hostapd` on the USB adapter only, with a
+generated test name and password that were never written anywhere else. hostapd went
+`COUNTRY_UPDATE`, `HT_SCAN`, `ENABLED`. `iw dev` showed type AP, channel 36 (5180 MHz), width
+80 MHz, centre 5210 MHz; `hostapd_cli status` showed `ieee80211ac=1`, `vht_oper_chwidth=1`, two
+spatial streams. One scan from the built-in radio, through its own `wpa_supplicant`, listed the
+beacon with WPA2-PSK and SAE. The watch then ran 65 times a minute apart; every line read
+`hostapd=yes state=ENABLED oper=up ch=36/80`.
+
+### The client role
+
+After the owner's change (a Wi-Fi inbound adapter is a client, in router mode), the adapter was
+joined by wanpire's own `WifiClient` to the very network the control adapter is on, the hardest
+case for keeping the control session where it is. It joined and had an address in 18 s, at
+Wi-Fi 6 rates (80 MHz, two streams, 865 Mbit/s link rate at -54 dBm), and pinged its gateway
+with no loss. The box's own default route stayed on the built-in radio (metric 600 against the
+client's 4000), its route to the outside still went that way, the client had no IPv6 address,
+answered ARP for its own address only, and `resolv.conf` was untouched; SSH over the built-in
+radio never stalled. Leaving (twice) stopped its `wpa_supplicant` and `dhcpcd`, removed its
+address, routes and files, and left the control adapter associated. A ten-minute timer was armed
+first to take the adapter down had the session been lost; it was not needed. `dhcpcd` with no
+configuration file (`-f /dev/null`) still asks for and installs the gateway. The line's own
+routing rule (router mode with outbound) was not tried on the box: the outbound adapter is a port
+of the running bridge.
