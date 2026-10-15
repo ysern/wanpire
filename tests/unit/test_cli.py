@@ -189,6 +189,41 @@ def test_up_refuses_an_invalid_mapping(box, capsys, tmp_path):
     assert calls == []
 
 
+# -- a line adapter that is not plugged in (serve-with-the-line-down) ------------------------
+
+def write_config(tmp_path, control="wlan0", inbound="eth0", outbound="eth1"):
+    cfg = tmp_path / "unplugged.json"
+    cfg.write_text(json.dumps({"schema": "wanpire-config/1", "mode": "bridge",
+                               "adapters": {"control": control, "inbound": inbound,
+                                            "outbound": [outbound]}}))
+    return str(cfg)
+
+
+def test_up_with_a_missing_line_adapter_leaves_the_line_down_and_exits_0(box, capsys, tmp_path):
+    _, calls = box
+    assert cli.main(["up", "--config", write_config(tmp_path, outbound="wlx1")]) == 0
+    err = capsys.readouterr().err
+    assert "the line waits for outbound adapter wlx1" in err and "not plugged in" in err
+    assert calls == []
+
+
+def test_up_with_a_missing_control_adapter_is_refused(box, capsys, tmp_path):
+    _, calls = box
+    assert cli.main(["up", "--config", write_config(tmp_path, control="wlan9")]) == 2
+    assert "control adapter wlan9 does not exist" in capsys.readouterr().err
+    assert calls == []
+
+
+def test_adapters_prints_the_roles_with_an_adapter_missing(box, capsys, tmp_path):
+    assert cli.main(["adapters", "--config", write_config(tmp_path, outbound="wlx1"),
+                     "--json"]) == 0
+    out, err = capsys.readouterr()
+    rows = {a["name"]: a for a in json.loads(out)}
+    assert rows["eth0"]["role"] == "inbound" and rows["wlan0"]["role"] == "control"
+    assert rows["eth1"]["role"] is None
+    assert "no roles" not in err and "wlx1" in err
+
+
 # -- serve --------------------------------------------------------------------------------
 
 def test_serve_starts_without_an_account(tmp_path, monkeypatch, capsys):
@@ -220,7 +255,7 @@ def test_serve_gives_the_api_roles_it_can_change(tmp_path, monkeypatch):
                             "adapters": {"control": "wlan0", "inbound": "eth0",
                                          "outbound": ["eth1"]}})
     monkeypatch.setattr(cli, "load_config", lambda *_: cfg)
-    monkeypatch.setattr(cli, "list_adapters", lambda: [])
+    monkeypatch.setattr(cli, "list_adapters", lambda: ADAPTERS)
     monkeypatch.setattr(cli, "make_engine", lambda **_: FakeEngine())
     class FakeModes:
         pass
@@ -237,6 +272,53 @@ def test_serve_gives_the_api_roles_it_can_change(tmp_path, monkeypatch):
     roles = seen["roles"]
     assert isinstance(roles.modes, FakeModes) and roles.path == path
     assert roles.config is cfg
+    assert roles.line_up
+
+
+def serve_with(monkeypatch, tmp_path, adapters):
+    """`wanpire serve` on a box whose configuration names outbound `wlx1`, with the engine,
+    the modes and uvicorn faked; returns the app it would have served, or None if it refused."""
+    import uvicorn
+
+    import wanpire.api
+    from wanpire.account import Account
+    from wanpire.config import config_from_dict
+    cfg = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
+                            "adapters": {"control": "wlan0", "inbound": "eth0",
+                                         "outbound": ["wlx1"]}})
+    monkeypatch.setattr(cli, "load_config", lambda *_: cfg)
+    monkeypatch.setattr(cli, "list_adapters", lambda: adapters)
+    monkeypatch.setattr(cli, "make_engine", lambda **_: FakeEngine())
+    monkeypatch.setattr(cli, "make_modes", lambda: object())
+    real = wanpire.api.create_app
+    monkeypatch.setattr(wanpire.api, "create_app", lambda **kw: real(**dict(kw, with_mcp=False)))
+    served = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: served.append(app))
+    account = tmp_path / "account"
+    Account(account).set("admin", "correct horse")
+    code = cli.main(["serve", "--config", str(tmp_path / "wanpire.json"), "--account-file",
+                     str(account), "--host", "127.0.0.1"])
+    return code, (served[0] if served else None)
+
+
+def test_serve_with_a_missing_outbound_adapter_starts_with_the_line_down(tmp_path, monkeypatch):
+    pytest.importorskip("fastapi")
+    import base64
+
+    from fastapi.testclient import TestClient
+    code, app = serve_with(monkeypatch, tmp_path, ADAPTERS)
+    assert code == 0 and app is not None
+    auth = {"Authorization": "Basic " + base64.b64encode(b"admin:correct horse").decode()}
+    status = TestClient(app).get("/api/v1/status", headers=auth).json()
+    assert status["line"] == {"up": False, "missing": ["wlx1"],
+                              "reason": "outbound adapter wlx1 is not plugged in"}
+
+
+def test_serve_with_a_missing_control_adapter_is_refused(tmp_path, monkeypatch, capsys):
+    pytest.importorskip("fastapi")
+    code, app = serve_with(monkeypatch, tmp_path, [a for a in ADAPTERS if a.name != "wlan0"])
+    assert code == 2 and app is None
+    assert "control adapter wlan0 does not exist" in capsys.readouterr().err
 
 
 def test_account_set_reads_the_password_from_stdin(tmp_path, monkeypatch, capsys):

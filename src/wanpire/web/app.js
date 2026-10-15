@@ -22,6 +22,8 @@ let user = null; // the account signed in, from the box
 let ticket = null; // loaded on entering (loadTicket)
 let kept = false; // the lease has a length and outlives this page (K7)
 let holds = false;
+let lineUp = true; // the line is down while a configured adapter is not plugged in
+let lineReason = "";
 let leaseTtl = 120;
 let endpoints = [];
 let statusTimer = null;
@@ -168,6 +170,19 @@ function joinPassProblem(pass) {
     : "A password has 8 to 63 printable ASCII characters, or 64 hexadecimal digits, or is empty for an open network.";
 }
 
+// A configured adapter the box does not have stays the drop-down's chosen entry, marked, so
+// the page shows the configured truth: the line under it says what to do.
+const isMissing = (role) => {
+  const o = $(`role-${role}`).selectedOptions[0];
+  return !!(o && o.dataset.missing);
+};
+
+function showMissing(role) {
+  const name = $(`role-${role}`).value;
+  $(`role-${role}-missing`).textContent = isMissing(role)
+    ? `${name} is not plugged in. Plug it in, or pick another adapter and Save.` : "";
+}
+
 function showWifiFields(role) {
   const name = $(`role-${role}`).value;
   const wifi = isWifi(name);
@@ -188,11 +203,19 @@ async function loadRoles() {
   offered = res.data.offered;
   mode = res.data.mode;
   networks = { inbound: res.data.wifi_clients || {}, outbound: res.data.access_points || {} };
+  const missing = res.data.missing || [];
   for (const role of ROLES) {
     const sel = $(`role-${role}`);
+    const name = res.data[role];
     sel.replaceChildren(...offered.map((a) => option(a.name, `${a.name} (${a.kind})`)));
-    sel.value = res.data[role];
+    if (missing.includes(name)) {
+      const o = option(name, `${name} (not plugged in)`);
+      o.dataset.missing = "1";
+      sel.append(o);
+    }
+    sel.value = name;
     showWifiFields(role);
+    showMissing(role);
   }
 }
 
@@ -200,6 +223,7 @@ for (const role of ROLES) {
   $(`role-${role}`).addEventListener("change", () => {
     $("role-error").textContent = "";
     showWifiFields(role);
+    showMissing(role);
   });
 }
 
@@ -221,6 +245,7 @@ $("roles-form").addEventListener("submit", async (ev) => {
   let wrong = problems.length > 0;
   for (const role of ROLES) {
     const name = body[role];
+    if (isMissing(role)) { showMissing(role); wrong = true; } // the line under it says why
     if (!isWifi(name)) continue;
     const f = FIELDS[role];
     const ssid = $(`${f}-ssid`).value;
@@ -240,6 +265,7 @@ $("roles-form").addEventListener("submit", async (ev) => {
       m.textContent = "The roles are saved and the line is set up with them.";
       await loadRoles();
       await loadAdapters();
+      refresh().catch(() => {}); // the line may have come up with the new roles
     } else {
       m.textContent = errorOf(res);
       m.classList.add("bad");
@@ -392,6 +418,12 @@ async function refresh() {
   const b = s.broker;
   leaseTtl = b.lease_ttl_s;
   $("mode").textContent = s.mode;
+
+  lineUp = s.line.up;
+  lineReason = lineUp ? "" : s.line.reason;
+  $("line-state").textContent = lineUp ? "up" : `down: ${lineReason}`;
+  $("line-state").className = lineUp ? "good" : "bad";
+  showLine();
 
   const applied = s.link.down.applied || s.link.up.applied;
   $("link-state").textContent = applied ? "impaired" : "no impairment";
@@ -610,11 +642,26 @@ function loadTicket() {
   startPolling();
 }
 
+// Apply is offered only with the lease held and the line up. While the line is down the Link
+// section says so, muted: it is the box's state, not a mistake of the person's.
+function showLine() {
+  $("apply").disabled = !holds || !lineUp;
+  const m = $("link-message");
+  if (!lineUp) {
+    say(`The line is down: ${lineReason}. Apply waits for it; the Adapters page sets the roles.`,
+      "", "link-message");
+    m.dataset.line = "1";
+  } else if (m.dataset.line) {
+    delete m.dataset.line;
+    say("", "", "link-message");
+  }
+}
+
 function showLease(text) {
   if (text) $("lease-state").textContent = text;
   else if (!ticket) $("lease-state").textContent = "You do not hold the link.";
   $("ask").disabled = !!ticket;
-  $("apply").disabled = !holds;
+  showLine();
   $("clear").disabled = !holds;
   $("release").disabled = !ticket;
   $("end-lease").hidden = !lastHolder || holds;

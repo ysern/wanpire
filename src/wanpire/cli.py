@@ -52,18 +52,60 @@ def control_address(adapter: str) -> str:
     raise ValueError(f"the control adapter {adapter} has no IPv4 address to listen on")
 
 
+def _load_for_the_line(path: str) -> tuple:
+    """The configuration and the line adapters the box lacks now. A line adapter may be
+    unplugged (a USB stick), so the file is loaded without the adapter check first; when none
+    is missing it is loaded with it, so the Wi-Fi rules apply. A missing control adapter is
+    refused as ever: the box would have nothing to listen on."""
+    adapters = {x.name: x for x in list_adapters()}
+    cfg = load_config(path, None)
+    if cfg.control not in adapters:
+        raise InvalidConfig(f"control adapter {cfg.control} does not exist; this box has: "
+                            f"{', '.join(sorted(adapters))}")
+    missing = cfg.missing(adapters)
+    if not missing:
+        cfg = load_config(path, adapters)
+    return cfg, missing
+
+
+def _up(a) -> int:
+    """Set the configured mode up. With a line adapter not plugged in, the line waits: said
+    on stderr, exit 0, so the service goes on to serve and brings the line up on its tick."""
+    cfg, missing = _load_for_the_line(a.config)
+    if missing:
+        print(f"wanpire: the line waits for {cfg.missing_named(missing)}: not plugged in",
+              file=sys.stderr)
+        return 0
+    make_modes().up(cfg)
+    return 0
+
+
 def _serve(a) -> int:
+    import logging
+
     import uvicorn
 
     from .api import create_app
     from .broker import Broker
-    adapters = None if a.netns else {x.name: x for x in list_adapters()}
-    cfg = load_config(a.config, adapters)
+    if a.netns:  # a test bed: the adapters live in the namespace, the line is read only
+        cfg, missing = load_config(a.config, None), ()
+    else:
+        cfg, missing = _load_for_the_line(a.config)
     from .roles import Roles
     # the roles may change while the server runs (PUT /api/v1/roles), so nothing below keeps
-    # its own copy of the outbound adapter; in a test bed (--netns) they are read only
+    # its own copy of the outbound adapter; in a test bed (--netns) they are read only.
+    # `wanpire up` ran before this with the same check: the line is up unless something is
+    # missing, and then the server's tick brings it up once the adapter is plugged in
     roles = Roles(cfg, list_adapters, modes=None if a.netns else make_modes(),
-                  path=None if a.netns else a.config)
+                  path=None if a.netns else a.config, missing=missing)
+    # the line's own lines (up at last, or why not) in the service's log, beside uvicorn's
+    ours = logging.getLogger("wanpire")
+    if not ours.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(logging.Formatter("wanpire: %(message)s"))
+        ours.addHandler(handler)
+        ours.setLevel(logging.INFO)
+        ours.propagate = False
     engine = make_engine(netns=a.netns, control=[cfg.control])
     broker = Broker(on_clear=lambda: engine.clear(roles.config.outbound[0]))
     account = Account(a.account_file)
@@ -218,10 +260,11 @@ def main(argv: list[str] | None = None) -> int:
             return _mcp(a)
         if a.command == "reset":
             return _reset(a)
-        if a.command in ("up", "down"):
+        if a.command == "up":
+            return _up(a)
+        if a.command == "down":
             adapters = {x.name: x for x in list_adapters()}
-            cfg = load_config(a.config, adapters)
-            getattr(make_modes(), a.command)(cfg)
+            make_modes().down(load_config(a.config, adapters))
             return 0
         if a.command == "preview":
             link, account = catalogue.preview(a.near, a.far)
@@ -267,8 +310,12 @@ def _link_to_apply(a) -> Link:
 def _print_adapters(config_path: str, as_json: bool) -> None:
     adapters = list_adapters()
     try:
-        cfg = load_config(config_path, {x.name: x for x in adapters})
+        # not checked against the adapters: the roles are the file's, plugged in or not
+        cfg = load_config(config_path, None)
         role = cfg.role
+        missing = cfg.missing(x.name for x in adapters)
+        if missing:
+            print(f"wanpire: {cfg.missing_reason(missing)}", file=sys.stderr)
     except InvalidConfig as e:
         print(f"wanpire: no roles: {e}", file=sys.stderr)
 

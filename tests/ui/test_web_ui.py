@@ -7,7 +7,8 @@ import httpx
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import AUTH, LEASE_TTL_S, PASSWORD, USER, sign_in
+from .conftest import AUTH, LEASE_TTL_S, PASSWORD, STICK, USER, sign_in
+from .test_look import style_of, token
 
 
 def agent_asks(box, who="agent-7", purpose="soak test"):
@@ -449,3 +450,38 @@ def test_a_refused_link_is_said_under_apply(page):
     expect(page.locator("#message")).to_be_empty()
     assert [c for c in page.box.engine.calls if c[0] == "apply"] == []
 
+
+# -- the line down for an adapter that is not plugged in (serve-with-the-line-down) ----------
+
+DOWN_REASON = "outbound adapter wlx1 is not plugged in"
+
+
+def test_the_line_row_says_up_in_the_good_colour(page):
+    sign_in(page)
+    expect(page.locator("#line-state")).to_have_text("up")
+    assert style_of(page, "#line-state", "color") == token(page, "--good")
+
+
+def test_the_line_row_says_down_and_why_in_the_danger_colour(down_page):
+    sign_in(down_page)
+    expect(down_page.locator("#line-state")).to_have_text(f"down: {DOWN_REASON}")
+    assert style_of(down_page, "#line-state", "color") == token(down_page, "--danger")
+
+
+def test_apply_is_not_offered_while_the_line_is_down_and_the_section_says_why(down_page):
+    sign_in(down_page)
+    down_page.fill("#purpose", "waiting for the stick")
+    down_page.click("#ask")
+    expect(down_page.locator("#lease-state")).to_contain_text("You hold the link")
+    expect(down_page.locator("#apply")).to_be_disabled()
+    expect(down_page.locator("#clear")).to_be_enabled()  # nothing is on a missing adapter
+    expect(down_page.locator("#link-message")).to_contain_text(DOWN_REASON)
+    assert "bad" not in down_page.locator("#link-message").get_attribute("class")  # muted
+    expect(down_page.locator("#message")).to_be_empty()
+    # the stick is plugged in: the server's tick brings the line up (called by hand here, the
+    # test bed has no tick) and the page follows at its next refresh
+    down_page.box.adapters.append(STICK)
+    down_page.box.roles.watch()
+    expect(down_page.locator("#line-state")).to_have_text("up", timeout=REFRESH_MS)
+    expect(down_page.locator("#apply")).to_be_enabled()
+    expect(down_page.locator("#link-message")).to_be_empty()

@@ -11,21 +11,23 @@ broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ti
     GET    /api/v1/session           who is signed in
     DELETE /api/v1/session           sign out
     PUT    /api/v1/account/password  {"current", "new"}: ends every other session
-    GET    /api/v1/status            mode, outbound adapter, link counters, holder and queue
+    GET    /api/v1/status            mode, outbound adapter, the line (up, or down and why),
+                                     link counters, holder and queue
     POST   /api/v1/lease             {"who", "purpose"} -> ticket, holds, position
     POST   /api/v1/lease/poll        keep the ticket alive (renews the dead-man for the holder)
     DELETE /api/v1/lease             release the lease, or leave the queue
     DELETE /api/v1/lease/holder      {"reason"}: end the current lease by hand
     GET    /api/v1/link              the link's counters
-    PUT    /api/v1/link              {"down", "up"} or {"near", "far"}   (lease)
+    PUT    /api/v1/link              {"down", "up"} or {"near", "far"}   (lease, the line up)
     DELETE /api/v1/link              clear                               (lease)
     GET    /api/v1/endpoints         the shipped endpoints and their channels
     GET    /api/v1/endpoints/{id}    one preset document
     POST   /api/v1/preview           {"near", "far"} -> the link and how it was worked out
     GET    /api/v1/adapters          every adapter, its facts and its role
-    GET    /api/v1/roles             inbound, outbound, their Wi-Fi networks, what may be picked
+    GET    /api/v1/roles             inbound, outbound, their Wi-Fi networks, what may be
+                                     picked, and which configured adapter is unplugged
     PUT    /api/v1/roles             {"inbound", "outbound", "access_points", "wifi_clients"}:
-                                     set them (idle line)
+                                     set them (idle line; allowed with the line down)
     POST   /mcp                      the MCP (streamable HTTP), its tools calling the routes above
 
 The web UI's static files are served at ``/`` without credentials: they hold no data, and the
@@ -170,6 +172,9 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
                 while True:
                     await asyncio.sleep(tick_s)
                     broker.status()  # settles expired leases and requests
+                    # brings the line up once a missing adapter is plugged in (a no-op
+                    # while it is up); off the loop, since it talks to the kernel
+                    await asyncio.to_thread(roles.watch)
             task = asyncio.create_task(tick())
         if mcp is None:
             yield
@@ -290,7 +295,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
         if not (link["down"].get("applied") or link["up"].get("applied")):
             described[0] = None
         return {"mode": roles.config.mode, "outbound": outbound_now(), "link": link,
-                "applied": described[0], "broker": b}
+                "applied": described[0], "broker": b, "line": roles.line_view()}
 
     @app.post(f"{api}/lease", dependencies=auth)
     def ask(body: dict = Body(...)):
@@ -332,6 +337,8 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
         if ends and figures:
             raise _Status(422, "give either two ends (near, far) or figures (down, up), not both")
         broker.require(ticket)
+        if not roles.line_up:  # nothing to apply to while a line adapter is unplugged
+            raise _Status(409, roles.line_view()["reason"])
         account = None
         if ends:
             if ends != {"near", "far"}:

@@ -5,6 +5,7 @@ Wi-Fi inbound adapter, the access point's fields beside a Wi-Fi outbound one, an
 from wanpire.config import config_from_dict
 
 from .conftest import CONFIG, sign_in
+from .test_look import style_of, token
 
 
 def open_roles(page):
@@ -149,3 +150,41 @@ def test_an_open_network_to_join_is_saved_in_router_mode(page):
     assert page.box.roles.config.inbound == "wlan1"
     assert page.box.roles.config.wifi_client("wlan1") == {"ssid": "upstream", "passphrase": ""}
     page.wait_for_selector("#adapters-table tr:has(td:text-is('wlan1')) td:text-is('inbound')")
+
+
+# -- the configured adapter is not plugged in (serve-with-the-line-down) ---------------------
+
+def chosen(page, sel):
+    return page.eval_on_selector(sel, "s => s.selectedOptions[0].textContent")
+
+
+def test_the_unplugged_outbound_adapter_stays_chosen_and_save_sends_nothing(down_page):
+    open_roles(down_page)
+    assert down_page.input_value("#role-outbound") == "wlx1"
+    assert chosen(down_page, "#role-outbound") == "wlx1 (not plugged in)"
+    assert options(down_page, "#role-outbound") == ["eth0", "eth1", "wlan1", "wlx1"]
+    assert options(down_page, "#role-inbound") == ["eth0", "eth1", "wlan1"]
+    line = down_page.locator("#role-outbound-missing")
+    assert "plug it in" in line.inner_text().lower() and "save" in line.inner_text().lower()
+    assert style_of(down_page, "#role-outbound-missing", "color") == token(down_page, "--danger")
+    assert down_page.inner_text("#role-inbound-missing") == ""
+    down_page.click("#roles-save")
+    down_page.wait_for_timeout(300)
+    assert down_page.box.modes.calls == [] and not down_page.box.roles.line_up
+    assert "plug it in" in down_page.inner_text("#role-outbound-missing").lower()
+
+
+def test_fixed_from_the_page(down_page):
+    open_roles(down_page)
+    down_page.select_option("#role-outbound", "eth1")
+    assert down_page.inner_text("#role-outbound-missing") == ""
+    down_page.click("#roles-save")
+    down_page.wait_for_selector("#roles-message:has-text('saved')")
+    assert down_page.box.roles.line_up and down_page.box.roles.config.outbound == ("eth1",)
+    assert down_page.box.modes.calls[-1] == ("up", "eth0", "eth1")
+    assert options(down_page, "#role-outbound") == ["eth0", "eth1", "wlan1"]  # the stick's entry gone
+    down_page.wait_for_selector("#adapters-table tr:has(td:text-is('eth1')) td:text-is('outbound')")
+    down_page.goto(down_page.box.url + "/#link")
+    page_line = down_page.locator("#line-state")
+    page_line.wait_for()
+    assert page_line.inner_text() == "up"

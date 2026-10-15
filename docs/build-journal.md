@@ -871,3 +871,41 @@ a panel or a transition outside 0.2 to 0.3 s; and the look test measures the ban
 the menu, the panels' spacing, the buttons, the table rows, the dialog's scrim, and that the accent
 appears on exactly two things on any page. The scroll-and-contrast test runs at 360 px too now, every
 page. The skill gained the four rules the fix needed and lacked.
+
+## 2026-10-15 — Serving with the line down
+
+The box came back on the home network with its two USB adapters out, and the page was gone with
+them. The unit runs `wanpire reset`, then `wanpire up`, then `wanpire serve`; `up` loaded the
+configuration checked against the adapters, the saved outbound adapter was the stick, so `up`
+refused, the unit failed, and systemd started it again every five seconds, 294 times by the
+afternoon. The only ways back were the stick or an editor over SSH. A missing line adapter had
+been made a failure of the whole box, where it is only a state of the line.
+
+So the line learned to wait (`openspec/changes/serve-with-the-line-down/`). The configuration loads unchecked first and names what it lacks:
+`up` says "the line waits for outbound adapter wlx…: not plugged in" and exits 0, and `serve`
+starts with the line down. The server owns that state now: on the tick it already had for the
+broker it lists the adapters, and the moment the configured ones exist it checks the
+configuration against them (a Wi-Fi outbound adapter is an access point, which the unchecked
+load could not know) and sets the mode up, logging one line. A refusal is logged once per
+reason and tried again at the next tick, with the reason in the status. The status carries
+`line`, up or down with the missing adapters and one sentence; the MCP passes it through.
+Applying a link is refused with that sentence; clearing is allowed, nothing being on a missing
+adapter. The roles can be changed while the line is down, which is the way out when the adapter
+is gone for good: a change to present adapters brings the line up, and a failed one leaves the
+old file and the line down. The control adapter stays fatal: without it nobody could reach the
+page to fix anything. The alternatives (udev, netlink events, a path unit) and the three
+assumptions are A87 to A89 in `docs/open-questions.md`.
+
+The page got a Line row on the State card, "up" in the good colour or "down: outbound wlx… is
+not plugged in" in the danger colour; while it is down Apply is not offered and the Link
+section says why, muted, since it is the box's state and not the person's mistake. The Adapters
+page keeps the configured adapter chosen, marked "(not plugged in)", with a danger line under it
+saying to plug it in or pick another and Save; Save with it still chosen sends nothing. Tests:
+the configuration, the CLI, the roles with a fake adapter list the stick is added to, the API,
+the page in a browser against a box started with the stick out, and the look test still green.
+
+On the Pi, with the stick out: the tree copied to the box, the package upgraded, the service
+restarted. The log says the line waits for the stick and uvicorn is up on the control address;
+the setup route answers and the status route asks for the account. Reading the status, and
+plugging the stick in to watch the line come up within a few seconds, is left to the owner at
+the box: this session has no sign-in and no hands. The owner then plugged the stick in, and the line came up on its own, as specified.

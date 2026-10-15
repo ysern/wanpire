@@ -109,6 +109,7 @@
           <p class="desc">What the box is doing now, refreshed every few seconds.</p>
           <div class="card"><dl class="card-body">
             <div><dt>Mode:</dt><dd id="mode">-</dd></div>
+            <div><dt>Line:</dt><dd id="line-state">-</dd></div>
             <div><dt>Link:</dt><dd id="link-state">-</dd></div>
             <div><dt>Held by:</dt><dd id="holder">-</dd></div>
             <div><dt>Queue:</dt><dd id="queue-count">-</dd></div>
@@ -238,6 +239,7 @@
             <div class="control">
               <select id="role-inbound"></select>
               <p class="help">Faces the wider network.</p>
+              <p id="role-inbound-missing" class="help bad" role="alert"></p>
             </div>
             <div id="net-inbound" class="ap-fields" hidden>
               <label for="net-inbound-ssid">Network to join:</label>
@@ -257,6 +259,7 @@
             <div class="control">
               <select id="role-outbound"></select>
               <p class="help">Faces the device under test; every impairment lives on it.</p>
+              <p id="role-outbound-missing" class="help bad" role="alert"></p>
               <p id="role-error" class="help bad" role="alert"></p>
             </div>
             <div id="ap-outbound" class="ap-fields" hidden>

@@ -271,3 +271,34 @@ def test_a_router_address_must_be_a_private_host_address():
         config_from_dict(doc(mode="router", router={"address": "10.5.0.0/24"}), BOX)
     with pytest.raises(InvalidConfig, match="private"):
         config_from_dict(doc(mode="router", router={"address": "8.8.8.1/24"}), BOX)
+
+
+# -- a line adapter that is not plugged in is a state of the line (serve-with-the-line-down) --
+
+def test_the_missing_outbound_adapter_is_named():
+    c = config_from_dict(doc(outbound=("wlx1",)))  # loaded without the adapter check
+    assert c.missing(BOX) == ("wlx1",)
+    assert c.missing_reason(("wlx1",)) == "outbound adapter wlx1 is not plugged in"
+
+
+def test_the_missing_inbound_adapter_is_named():
+    c = config_from_dict(doc(inbound="eth5"))
+    assert c.missing(BOX) == ("eth5",)
+    assert c.missing_reason(("eth5",)) == "inbound adapter eth5 is not plugged in"
+
+
+def test_both_missing_line_adapters_are_named_in_one_sentence():
+    c = config_from_dict(doc(inbound="eth5", outbound=("wlx1",)))
+    assert c.missing(BOX) == ("eth5", "wlx1")
+    assert c.missing_reason(("eth5", "wlx1")) == (
+        "inbound adapter eth5 and outbound adapter wlx1 are not plugged in")
+
+
+def test_nothing_missing_when_every_line_adapter_is_plugged_in():
+    c = config_from_dict(doc(), BOX)
+    assert c.missing(BOX) == () and c.missing_reason(()) == ""
+
+
+def test_a_missing_control_adapter_is_not_the_lines():
+    c = config_from_dict(doc(control="wlan9"))  # refused elsewhere: nothing to listen on
+    assert c.missing(BOX) == ()

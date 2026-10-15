@@ -89,6 +89,28 @@ class Config:
         net = self.wifi_clients.get(adapter)
         return dict(net) if net else None
 
+    def missing(self, have) -> tuple[str, ...]:
+        """The line adapters (inbound, then outbound) not among ``have``, the names the box
+        has now: a configuration loaded without the adapter check can say which of them are
+        unplugged, so the box can start with the line down and say why. The control adapter
+        is never among them: without it the box cannot be reached, and its absence is refused
+        before this is asked."""
+        have = set(have)
+        return tuple(n for n in (self.inbound, *self.outbound) if n not in have)
+
+    def missing_named(self, missing) -> str:
+        """``missing`` (from ``missing``) with their roles: "outbound adapter wlx1", or
+        "inbound adapter eth5 and outbound adapter wlx1"."""
+        return " and ".join(f"{'inbound' if n == self.inbound else 'outbound'} adapter {n}"
+                            for n in missing)
+
+    def missing_reason(self, missing) -> str:
+        """One sentence for ``missing`` (from ``missing``): "outbound adapter wlx1 is not
+        plugged in"; empty when nothing is."""
+        if not missing:
+            return ""
+        return f"{self.missing_named(missing)} {'is' if len(missing) == 1 else 'are'} not plugged in"
+
     def to_dict(self) -> dict:
         d = {"schema": SCHEMA, "mode": self.mode,
              "adapters": {"control": self.control, "inbound": self.inbound,

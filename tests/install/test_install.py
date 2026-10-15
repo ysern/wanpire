@@ -148,6 +148,10 @@ def test_an_old_token_is_removed(box):
 
 
 def test_the_unit_clears_before_it_sets_up_and_serves(box):
+    # The unit is unchanged by serve-with-the-line-down: a line adapter that is not plugged in
+    # fails neither `reset` nor `up` (both exit 0, `up` saying the line waits for it), so the
+    # server starts with the line down. The script stages no `wanpire` to run, so that
+    # scenario is pinned by the CLI's unit tests (tests/unit/test_cli.py, `up` and `serve`).
     box(*ROLES)
     lines = (box.root / "etc/systemd/system/wanpire.service").read_text().splitlines()
     order = [i for i, line in enumerate(lines)

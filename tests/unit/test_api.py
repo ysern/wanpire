@@ -456,6 +456,100 @@ def test_adapters_with_roles(box):
     assert rows["eth1"]["role"] == "outbound" and rows["wlan0"]["role"] == "control"
 
 
+# -- the line down for an adapter that is not plugged in (serve-with-the-line-down) ----------
+
+from wanpire.roles import Roles  # noqa: E402
+
+DOWN_REASON = "outbound adapter wlx1 is not plugged in"
+
+
+class RecordingModes:
+    def __init__(self):
+        self.calls = []
+
+    def up(self, cfg):
+        self.calls.append(("up", cfg.inbound, cfg.outbound[0]))
+
+    def down(self, cfg):
+        self.calls.append(("down", cfg.inbound, cfg.outbound[0]))
+
+
+def make_down_box(tmp_path, tick_s=None):
+    """A box served with the USB stick `wlx1`, its outbound adapter, unplugged."""
+    cfg = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
+                            "adapters": {"control": "wlan0", "inbound": "eth0",
+                                         "outbound": ["wlx1"]}})
+    present = list(ADAPTERS)
+    roles = Roles(cfg, lambda: present, modes=RecordingModes(),
+                  path=str(tmp_path / "wanpire.json"), missing=("wlx1",))
+    engine, clock = RecordingEngine(), Clock()
+    broker = Broker(clock=clock, on_clear=lambda: engine.clear(roles.config.outbound[0]))
+    account = Account(tmp_path / "account")
+    account.set(USER, PASSWORD)
+    app = create_app(engine=engine, broker=broker, config=cfg, account=account,
+                     list_adapters=lambda: present, tick_s=tick_s, fail_delay_s=0,
+                     with_mcp=False, roles=roles)
+    client = TestClient(app)
+    client.engine, client.roles, client.present = engine, roles, present
+    return client
+
+
+@pytest.fixture
+def down_box(tmp_path):
+    return make_down_box(tmp_path)
+
+
+def line(c):
+    return c.get("/api/v1/status", headers=AUTH).json()["line"]
+
+
+def test_the_status_says_the_line_is_up(box):
+    assert line(box) == {"up": True}
+
+
+def test_the_status_says_the_line_is_down_and_why(down_box):
+    assert line(down_box) == {"up": False, "missing": ["wlx1"], "reason": DOWN_REASON}
+
+
+def test_apply_with_the_line_down_is_409_and_the_engine_is_not_called(down_box):
+    a = ask(down_box)
+    r = down_box.put("/api/v1/link", json={"near": "london", "far": "tokyo"},
+                     headers=t(a["ticket"]))
+    assert r.status_code == 409 and r.json()["error"] == DOWN_REASON
+    assert not any(c[0] == "apply" for c in down_box.engine.calls)
+
+
+def test_clear_with_the_line_down_succeeds(down_box):
+    a = ask(down_box)
+    assert down_box.delete("/api/v1/link", headers=t(a["ticket"])).status_code == 204
+    assert down_box.engine.calls[-1] == ("clear", "wlx1")
+
+
+def test_the_roles_name_the_missing_adapter(down_box):
+    got = down_box.get("/api/v1/roles", headers=AUTH).json()
+    assert got["outbound"] == "wlx1" and got["missing"] == ["wlx1"]
+
+
+def test_fixing_the_roles_while_down_brings_the_line_up(down_box):
+    r = down_box.put("/api/v1/roles", json={"inbound": "eth0", "outbound": "eth1"}, headers=AUTH)
+    assert r.status_code == 200, r.text
+    assert r.json()["outbound"] == "eth1" and r.json()["missing"] == []
+    assert down_box.roles.modes.calls[-1] == ("up", "eth0", "eth1")
+    assert line(down_box) == {"up": True}
+
+
+def test_the_tick_watches_for_the_adapter(tmp_path):
+    import time
+    c = make_down_box(tmp_path, tick_s=0.02)
+    with c:  # the lifespan runs: the tick with it
+        c.present.append(Adapter("wlx1", "usb-ethernet", "aa:bb:cc:dd:ee:09", "up", 1000, False))
+        deadline = time.monotonic() + 5
+        while not c.roles.line_up and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert line(c) == {"up": True}
+    assert c.roles.modes.calls == [("up", "eth0", "wlx1")]
+
+
 def test_invalid_link_from_the_model_is_the_same_message():
     with pytest.raises(InvalidLink, match="loss_pct"):
         Direction(loss_pct=120)

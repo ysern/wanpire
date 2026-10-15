@@ -39,6 +39,12 @@ CONFIG = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
                            "adapters": {"control": "wlan0", "inbound": "eth0",
                                         "outbound": ["eth1"]},
                            "wifi": {"country": "GB"}})
+# a box served with its USB stick `wlx1`, the outbound adapter, unplugged: loaded unchecked
+DOWN_CONFIG = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
+                                "adapters": {"control": "wlan0", "inbound": "eth0",
+                                             "outbound": ["wlx1"]},
+                                "wifi": {"country": "GB"}})
+STICK = Adapter("wlx1", "usb-ethernet", "aa:bb:cc:dd:ee:06", "up", 1000, False)
 
 
 class RecordingModes:
@@ -79,19 +85,23 @@ class RecordingEngine:
 
 
 class Box:
-    def __init__(self, with_account=True):
+    def __init__(self, with_account=True, config=CONFIG, missing=()):
+        """``missing``: the configured line adapters the box lacks (the line starts down).
+        ``adapters`` is the box's list, which a test may plug the stick into."""
         self.engine = RecordingEngine()
         self.modes = RecordingModes()
+        self.adapters = list(ADAPTERS)
         self.config_path = Path(tempfile.mkdtemp()) / "wanpire.json"
-        self.roles = Roles(CONFIG, lambda: ADAPTERS, modes=self.modes, path=str(self.config_path))
+        self.roles = Roles(config, lambda: self.adapters, modes=self.modes,
+                           path=str(self.config_path), missing=missing)
         self.broker = Broker(on_clear=lambda: self.engine.clear(self.roles.config.outbound[0]),
                              lease_ttl_s=LEASE_TTL_S, queue_ttl_s=LEASE_TTL_S)
         self.account = Account(Path(tempfile.mkdtemp()) / "account")
         if with_account:
             self.account.set(USER, PASSWORD)
-        app = create_app(engine=self.engine, broker=self.broker, config=CONFIG,
-                         account=self.account, list_adapters=lambda: ADAPTERS, tick_s=None,
-                         fail_delay_s=0, roles=self.roles)
+        app = create_app(engine=self.engine, broker=self.broker, config=config,
+                         account=self.account, list_adapters=lambda: self.adapters,
+                         tick_s=None, fail_delay_s=0, roles=self.roles)
         with socket.socket() as s:
             s.bind(("127.0.0.1", 0))
             self.port = s.getsockname()[1]
@@ -141,6 +151,15 @@ def new_box():
     b.stop()
 
 
+@pytest.fixture
+def down_box():
+    """A box started with the stick out: the line is down for outbound `wlx1`."""
+    b = Box(config=DOWN_CONFIG, missing=("wlx1",))
+    b.start()
+    yield b
+    b.stop()
+
+
 def _page(browser, box):
     context = browser.new_context(viewport={"width": 1000, "height": 900})
     pg = context.new_page()
@@ -159,6 +178,13 @@ def page(browser, box):
 @pytest.fixture
 def new_page(browser, new_box):
     context, pg = _page(browser, new_box)
+    yield pg
+    context.close()
+
+
+@pytest.fixture
+def down_page(browser, down_box):
+    context, pg = _page(browser, down_box)
     yield pg
     context.close()
 

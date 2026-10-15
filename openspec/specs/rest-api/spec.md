@@ -77,7 +77,9 @@ current and a new password SHALL change it and end every other session.
 `GET /api/v1/status` SHALL carry `applied`: the two ends with their channels resolved when the
 link was applied from ends (`{"near": "london:generic", "far": "los-angeles:mobile-4g"}`),
 `{"figures": true}` when it was applied from raw figures, and `null` when the engine reports
-no link applied, whatever cleared it.
+no link applied, whatever cleared it. It SHALL also carry `line`: `{"up": true}` while the mode
+is set up, or `{"up": false, "missing": [...], "reason": "..."}` naming the configured line
+adapters the box does not have and saying so in one sentence.
 
 #### Scenario: Applied from two ends
 - **GIVEN** the holder applied `{"near": "london", "far": "los-angeles:mobile-4g"}`
@@ -93,6 +95,11 @@ no link applied, whatever cleared it.
 - **GIVEN** a link applied from two ends
 - **WHEN** the holder clears it, or its lease ends and the broker clears it, and the status is read
 - **THEN** `applied` is `null`
+
+#### Scenario: The line is down
+- **GIVEN** the server started with outbound `wlx1` not plugged in
+- **WHEN** anyone reads the status
+- **THEN** `line` is `{"up": false, "missing": ["wlx1"], "reason": "outbound adapter wlx1 is not plugged in"}`
 
 ### Requirement: Asking, polling and releasing the lease
 
@@ -117,7 +124,8 @@ a lease that ended without its holder SHALL be answered 410 with why, once.
 answered 409 naming the holder otherwise. `PUT` SHALL accept either raw figures
 (`{"down": {...}, "up": {...}}`) or two ends (`{"near": "london:consumer-fibre", "far":
 "tokyo"}`), and SHALL answer 422 with the reason for an invalid one. Reading the link SHALL need
-no ticket.
+no ticket. While the line is down, `PUT` SHALL be answered 409 with the line's reason and the
+engine SHALL NOT be called; `DELETE` SHALL succeed, there being nothing on a missing adapter.
 
 #### Scenario: Apply from two ends
 - **GIVEN** A holds the lease
@@ -133,6 +141,11 @@ no ticket.
 #### Scenario: An invalid link
 - **WHEN** the holder puts a link with 120% loss
 - **THEN** the answer is 422 naming `loss_pct`
+
+#### Scenario: Apply with the line down
+- **GIVEN** the holder of the lease, and the line down for a missing outbound adapter
+- **WHEN** the holder puts a link
+- **THEN** the answer is 409 saying the outbound adapter is not plugged in, and the engine is not called
 
 ### Requirement: A lease can be asked for a length of time
 
@@ -205,12 +218,14 @@ without a restart.
 
 `GET /api/v1/roles` SHALL return the mode, the control, inbound and outbound adapters, the access
 point of a Wi-Fi outbound adapter, the network a Wi-Fi inbound adapter joins, and the adapters that may be picked for inbound and
-outbound: every adapter but virtual ones and the control adapter when it is Wi-Fi.
+outbound: every adapter but virtual ones and the control adapter when it is Wi-Fi. It SHALL
+also return `missing`: the configured line adapters the box does not have now.
 `PUT /api/v1/roles` SHALL take an inbound and an outbound adapter, the network to join for a Wi-Fi
 inbound one (`wifi_clients`) and an access point for a Wi-Fi outbound one (`access_points`); validate them as the configuration is validated; refuse one adapter in both roles;
 then take the mode down, write the configuration and set the mode up again with it. A refused
 change SHALL leave the box and the file as they were. A change SHALL be refused with 409 while a
-link is applied or a lease is held.
+link is applied or a lease is held. A change SHALL be allowed while the line is down, and a
+change to present adapters SHALL bring the line up.
 
 #### Scenario: Reading the roles
 - **GIVEN** a box in bridge mode with control `wlan0`, inbound `eth0` and outbound `eth1`, and a USB Wi-Fi adapter `wlan1`
@@ -241,3 +256,13 @@ link is applied or a lease is held.
 - **GIVEN** the same box with a link applied
 - **WHEN** a client puts new roles
 - **THEN** the answer is 409 with a message saying the roles change only with no link applied and no lease held
+
+#### Scenario: Reading the roles with the line down
+- **GIVEN** a box configured with outbound `wlx1`, which is not plugged in
+- **WHEN** a client asks `GET /api/v1/roles`
+- **THEN** the answer names outbound `wlx1` and lists `wlx1` under `missing`
+
+#### Scenario: Fixing the roles with the line down
+- **GIVEN** the same box, no lease held
+- **WHEN** a client puts inbound `eth0` and outbound `eth1`
+- **THEN** the answer is 200, the configuration names outbound `eth1`, the mode is set up with it and the status says the line is up

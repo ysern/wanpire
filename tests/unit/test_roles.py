@@ -242,3 +242,93 @@ def test_wifi_clients_must_be_a_mapping(tmp_path, router_roles):
     r = box(tmp_path, router_roles).put("/api/v1/roles", headers=AUTH, json={
         "inbound": "wlan1", "outbound": "eth1", "wifi_clients": ["wlan1"]})
     assert r.status_code == 422 and "wifi_clients" in r.json()["error"]
+
+
+# -- the line down for an adapter that is not plugged in (serve-with-the-line-down) ----------
+
+DOWN_DOC = dict(DOC, adapters={"control": "wlan0", "inbound": "eth0", "outbound": ["wlx1"]})
+DOWN_REASON = "outbound adapter wlx1 is not plugged in"
+
+
+def down_roles(tmp_path, present=None, modes=None):
+    """Roles as `wanpire serve` makes them with the USB stick `wlx1` out: the configuration
+    loaded without the adapter check, `wlx1` missing. ``present`` is the box's adapter list,
+    which a test may add the stick to."""
+    present = ADAPTERS if present is None else present
+    cfg = config_from_dict(DOWN_DOC)
+    r = Roles(cfg, list_adapters=lambda: present, modes=modes or RecordingModes(),
+              path=str(tmp_path / "wanpire.json"), missing=("wlx1",))
+    r.path_obj = tmp_path / "wanpire.json"
+    return r
+
+
+def test_the_line_view_down_names_the_missing_adapter_and_why(tmp_path):
+    r = down_roles(tmp_path)
+    assert r.line_up is False and r.missing == ("wlx1",)
+    assert r.line_view() == {"up": False, "missing": ["wlx1"], "reason": DOWN_REASON}
+
+
+def test_the_line_view_up(roles):
+    assert roles.line_up is True and roles.line_view() == {"up": True}
+
+
+def test_watch_brings_the_line_up_once_the_adapter_appears(tmp_path):
+    present = list(ADAPTERS)
+    r = down_roles(tmp_path, present)
+    r.watch()
+    assert not r.line_up and r.modes.calls == []
+    present.append(adapter("wlx1", "usb-ethernet"))
+    r.watch()
+    assert r.line_up and r.modes.calls == [("up", "eth0", "wlx1")]
+    assert r.line_view() == {"up": True}
+    r.watch()
+    assert r.modes.calls == [("up", "eth0", "wlx1")]  # once
+
+
+def test_watch_checks_the_wifi_rules_once_the_adapter_is_there(tmp_path):
+    # a Wi-Fi outbound adapter is an access point: the loaded configuration could not know the
+    # adapter's kind while it was out, so the rules run when it appears
+    present = list(ADAPTERS) + [adapter("wlx1", "wifi")]
+    r = down_roles(tmp_path, present)
+    r.watch()
+    assert not r.line_up and r.modes.calls == []
+    assert r.line_view()["missing"] == [] and "network name" in r.line_view()["reason"]
+
+
+def test_a_refused_set_up_leaves_the_line_down_with_the_refusal(tmp_path):
+    present = list(ADAPTERS) + [adapter("wlx1", "usb-ethernet")]
+    r = down_roles(tmp_path, present, modes=RecordingModes(fail_on="wlx1"))
+    r.watch()
+    assert not r.line_up
+    assert r.line_view() == {"up": False, "missing": [],
+                             "reason": "the access point on wlan1 did not come up: no channel"}
+    r.watch()  # tried again at the next tick
+    assert r.modes.calls == [("up", "eth0", "wlx1")] * 2
+
+
+def test_a_change_while_down_brings_the_line_up(tmp_path):
+    r = down_roles(tmp_path)
+    r.change("eth0", "eth1", {})
+    assert r.line_up and r.line_view() == {"up": True}
+    assert r.modes.calls == [("down", "eth0", "wlx1"), ("up", "eth0", "eth1")]
+    assert load_config(str(r.path_obj), BY_NAME).outbound == ("eth1",)
+
+
+def test_a_failed_change_while_down_leaves_the_old_file_and_the_line_down(tmp_path):
+    r = down_roles(tmp_path, modes=RecordingModes(fail_on="wlan1"))
+    with pytest.raises(ModeRefused, match="no channel"):
+        r.change("eth0", "wlan1", {"wlan1": AP})
+    assert not r.line_up and r.config.outbound == ("wlx1",)
+    assert r.line_view() == {"up": False, "missing": ["wlx1"], "reason": DOWN_REASON}
+    assert load_config(str(r.path_obj)).outbound == ("wlx1",)
+    assert r.modes.calls == [("down", "eth0", "wlx1"), ("up", "eth0", "wlan1"),
+                             ("down", "eth0", "wlan1")]  # old is not set up: wlx1 is out
+
+
+def test_the_roles_view_names_the_missing_adapter(tmp_path):
+    got = box(tmp_path, down_roles(tmp_path)).get("/api/v1/roles", headers=AUTH).json()
+    assert got["outbound"] == "wlx1" and got["missing"] == ["wlx1"]
+
+
+def test_the_roles_view_names_nothing_missing(tmp_path, roles):
+    assert box(tmp_path, roles).get("/api/v1/roles", headers=AUTH).json()["missing"] == []

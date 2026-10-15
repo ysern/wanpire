@@ -111,6 +111,15 @@ def test_clear_removes_everything_and_tolerates_nothing_to_clear():
     assert ["ip", "link", "del", "ifb-eth1"] in r.calls
 
 
+def test_clear_on_an_adapter_that_does_not_exist_returns_without_error():
+    # what `wanpire reset` does at boot with the USB stick out: nothing is on a missing adapter
+    gone = CommandFailed(["tc"], 1, 'Cannot find device "wlx1"')
+    e, r = engine({("tc",): gone, ("ip",): gone, ("systemctl",): gone})
+    e.clear("wlx1")
+    assert ["tc", "qdisc", "del", "dev", "wlx1", "root"] in r.calls
+    assert ["ip", "link", "del", "ifb-wlx1"] in r.calls
+
+
 def test_a_real_failure_while_adding_is_raised_and_the_adapter_cleared():
     bad = CommandFailed(["tc"], 2, "Error: Specified qdisc kind is unknown.")
     e, r = engine({("tc", "qdisc", "add"): bad})
