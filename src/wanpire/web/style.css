@@ -1,7 +1,7 @@
 /* wanpire's page: a settings console, simple and neat. The rules are written out in
    .claude/skills/web-ui-house-style/SKILL.md; tests/unit/test_web_style.py reads this sheet
    against them and tests/ui/test_look.py measures the page.
-   The palette is wanpire's own: a wine-red primary (a vampire on the wire) and a warm amber
+   The palette is wanpire's own: a wine-red primary (a vampire on the wire), which is also the
    accent for what is active. Both themes meet WCAG 2.2 AA contrast. */
 
 :root {
@@ -24,8 +24,8 @@
   --calm-1: #f7e6ea;         /* the band with no link: a pastel of the same wine */
   --calm-2: #efd3da;
   --calm-ink: #5a0d1c;       /* on #efd3da: about 12:1 */
-  --accent: #f2b134;        /* active: a warm amber */
-  --on-accent: #5a0d1c;
+  --accent: #6e1022;        /* active: the deep wine, the primary's far end */
+  --on-accent: #ffffff;     /* 11.9:1 on the deep wine */
   --glow: rgba(160, 33, 58, 0.35);
   --halo: rgba(160, 33, 58, 0.16);
   --scrim: rgba(0, 0, 0, 0.45);

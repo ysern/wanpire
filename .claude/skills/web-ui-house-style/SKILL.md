@@ -13,7 +13,7 @@ and not a dashboard. It lives in one stylesheet, `src/wanpire/web/style.css`, an
 `src/wanpire/web/index.html`; `tests/ui/test_look.py` measures it.
 
 **Take the style, never a brand.** The palette is wanpire's own: a wine primary, a vampire on the wire, and
-a warm amber accent for what is active. Nothing in this file names anyone else's colour, and no page may
+the deep wine as the accent for what is active. Nothing in this file names anyone else's colour, and no page may
 introduce one. No provider, vendor or trademark is named in the page or its artwork.
 
 The rules are measured. Where a number is given it is the target, with the tolerance stated; where a word is
@@ -235,8 +235,8 @@ which is the one source; this table is a copy for reading, and the file wins whe
 | Primary as text on a panel | `--primary-text` | `#a0213a` | `#ff8fa3` |
 | Band with a link | `--band-1` to `--band-2`, ink `--band-ink` | `#a0213a` to `#6e1022`, `#ffffff` | `#7d1729` to `#4f0b18`, `#ffffff` |
 | Band with no link | `--calm-1` to `--calm-2`, ink `--calm-ink` | `#f7e6ea` to `#efd3da`, `#5a0d1c` | `#2b2427` to `#231c1f`, `#ecd7dc` |
-| Accent (active only) | `--accent` | `#f2b134` | `#f2b134` |
-| Text on accent | `--on-accent` | `#5a0d1c` | `#5a0d1c` |
+| Accent (active only) | `--accent` | `#6e1022` | `#6e1022` |
+| Text on accent | `--on-accent` | `#ffffff` | `#ffffff` |
 | Text on a primary button | `--on-primary` | `#ffffff` | `#ffffff` |
 | A dialog's scrim | `--scrim` | black at 45% | black at 45% |
 | Button glow | `--glow` | wine at 35% | `#ff8fa3` at 22% |
@@ -245,8 +245,8 @@ which is the one source; this table is a copy for reading, and the file wins whe
 | Good | `--good` | `#1e7d3c` | `#6fd38d` |
 | Warn | `--warn` | `#8a5a00` | `#f2c14e` |
 
-The primary is a wine red deep enough that white on it passes AA at both ends; the accent is a warm amber so
-that it reads as "active" against the wine; the calm band is a pastel of the same wine so that the band
+The primary is a wine red deep enough that white on it passes AA at both ends; the accent is the deep wine (`#6e1022`, the gradient's far end) so that the active item wears the
+page's one colour and still stands off the live band's light end, with white on it (11.9:1); the calm band is a pastel of the same wine so that the band
 changes meaning without changing family. Where this file says "primary", "accent", "tint" or "muted", it
 means these properties.
 
