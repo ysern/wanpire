@@ -33,22 +33,24 @@ given ("about", "roughly") the proportion matters more than the pixel.
 - **Padding inside a panel:** generous. About 40 px top, and 40 to 90 px at the sides (less beside a side
   menu, where the content panel is narrower). Content never touches a panel's edge.
 - **A footer**, when there is one, is inside the last panel under a hairline: uppercase 14 px text actions
-  with a small line icon each, right-aligned, in the body text colour.
+  with a small line icon each, right-aligned, in the body text colour. wanpire's has one: "Source", a branch
+  icon, linking to the repository; the host is not named.
 - **Themes:** light and dark, decided by `prefers-color-scheme`, both meeting WCAG 2.2 AA; no class names a
   theme. Every colour comes from a custom property on `:root`. A rule that paints a literal colour is
   wrong before it is looked at.
 
 ## 2. The band and the top-level navigation
 
-- **One band, about 160 px tall**, full width. **It shows the link:** with no link applied it is a calm
+- **One band, 160 to 180 px tall**, full width: the brand row and the sections make 160, and the link line
+  under the mark adds its own row (about 175 at 1,280 px). **It shows the link:** with no link applied it is a calm
   pastel of the wine (`--calm-1` to `--calm-2`, its text and icons in `--calm-ink`); with a link applied it
   is the wine gradient (`--band-1` to `--band-2`, text and icons in `--band-ink`). A short line under the
   mark, aligned to its left, says which, in the API's own form (`london:generic <> los-angeles:generic`,
   `set by figures`, `no link`). No photograph, no illustration beyond the mark.
 - **Top row:** the mark (52 px), the name in 24 px bold with a 13 px tagline under it, all in the band's
   ink. Utility links, when any, at the right as a small line icon plus a 13 to 14 px label.
-- **Second row: the top-level sections** — Link, Broker, Adapters, Endpoints, Settings — evenly spaced on
-  the column. Each is a **44 px circle with a 1.5 px outline in the band's ink holding a line icon**, and a
+- **Second row: the top-level sections** — Link, Broker, Adapters, Endpoints, Settings — left-aligned on
+  the column, 16 px apart: the same gap the band keeps to the frame below it. Each is a **44 px circle with a 1.5 px outline in the band's ink holding a line icon**, and a
   13 to 14 px label under it. **The active section's circle is filled with the accent, its icon in
   `--on-accent`, and its label is bold.** That filled circle is the only accent on the band and, with the
   open side-menu group, the only accent on the page.
@@ -136,7 +138,8 @@ A segmented bar the content width: equal cells, 1 px outline in `--primary-1`, r
   column, 14 px body colour, rows about 38 px apart. Groups are separated by a hairline, each with a bold
   14 px group head. Nothing is boxed.
 - **A status card** (`.card`), for the link's figures, the counters and the box's state: a pale tinted panel
-  (`--tint`), radius 10 px, with a bold 16 px title, holding a white inner panel with **two columns of
+  (`--tint`), radius 10 px, with a bold 16 px title when the card is not its section's whole body (then
+  the section's title serves), holding a white inner panel with **two columns of
   "label:" left and value right-aligned**, the values bold with tabular figures, split by a vertical
   hairline when there are two groups.
 - **State words** take their colour from their meaning only: `--good`, `--warn`, `--danger`. Never for
@@ -155,8 +158,8 @@ A segmented bar the content width: equal cells, 1 px outline in `--primary-1`, r
 - Live state in a row is a toggle; actions are primary line icons in the last column.
 - **The empty state** is one pill holding one muted line ("No entries.").
 - **Expandable rows** (`.place` on the Endpoints page) carry a chevron at the left that turns down when
-  open; what opens is a grid of `.channel` cards on the tint, each with a bold name, a `.tag`, a muted
-  sentence and a small right-aligned figures table with tabular numbers.
+  open; what opens is a grid of `.channel` cards on the tint, each with a bold name, a `.tag` (one 13 px word in `--primary-text` with a 1 px
+  outline of the same, radius 10 px, no fill: the accent is for the active item), a muted sentence and a small right-aligned figures table with tabular numbers.
 - No pagination controls unless the table is long; then simple numbered pages, 32 px squares, no borders.
 
 ## 10. Log and text views
@@ -168,7 +171,7 @@ actions at the right of the same row.
 
 ## 11. Dialogs, tooltips and messages
 
-- **A modal dialog:** a `--panel` box, radius 10 px, no visible border, over a scrim of about 45% black.
+- **A modal dialog:** a `--panel` box, radius 10 px, no visible border, over a scrim of about 45% black (`--scrim`).
   Its header strip is the tint with a 16 px bold title and a muted close cross at the right; its body is a
   form by the rules above; its actions are one primary button and one text action.
 - **A tooltip:** a tinted popup, radius 5 px, a 2 px soft drop shadow at 12% black, 14 px body text, at most
@@ -180,8 +183,10 @@ actions at the right of the same row.
 
 ## 12. The set-up and sign-in cards
 
-- **The whole page is the band's colour** behind the card, with at most a faint pale wave at the bottom.
-  The top row is the mark and the name.
+- **The whole page is the band's colour** behind the card, the wine gradient `--band-1` to `--band-2`
+  whatever the link's state (the page has no session yet), with at most a faint pale wave at the bottom.
+  The top row is the mark (52 px) and the name (24 px bold) in `--band-ink`, on the column; the card keeps
+  its own mark.
 - **A centred white card, about 420 by 480 px** (the test allows 380 to 460 wide, centred within 4 px),
   radius 10 px, with a very large soft wine-tinted halo (`0 0 100px --halo`). It holds, with about 44 px
   side padding: the mark (56 px, centred); a **centred bold 22 px title** with a muted lead line; bold
@@ -200,7 +205,7 @@ actions at the right of the same row.
 | Text | A dark slate (`--text`), never pure black. |
 | Muted | For descriptions, help, placeholders, inactive menu items and secondary cell lines (`--muted`, `#646c71`). **It must still pass AA on white and on the tint:** a lighter grey reads right but fails 4.5:1, which is why the value is as dark as it is (5.4:1 on white, 4.8:1 on the tint). |
 | Hairline | 1 px in `--hair`, a light neutral. |
-| Primary | Band when live, buttons, links, actions, checkmarks, toggles, focus, dots, line-art icons. White on it passes AA at both ends of the gradient (7.6:1 and 11.9:1). Links and actions on a panel use `--primary-text`, which the dark theme lightens. |
+| Primary | Band when live, buttons, links, actions, checkmarks, toggles, focus, dots, line-art icons. White on it (`--on-primary`) passes AA at both ends of the gradient (7.6:1 and 11.9:1). Links and actions on a panel use `--primary-text`, which the dark theme lightens. |
 | Accent | **The active item and counters only:** the active nav circle, the open menu group, a counter badge. Never a button, never text on white. |
 | Danger, good, warn | State and destructive actions. Never decoration. |
 | Radii | **10 px** panels, cards, dialogs, menu. **5 px** inputs, buttons, tabs, log boxes. **6 to 8 px** table-row pills and channel cards. **50%** icon circles and dots. 20 px toggles. |
@@ -232,6 +237,8 @@ which is the one source; this table is a copy for reading, and the file wins whe
 | Band with no link | `--calm-1` to `--calm-2`, ink `--calm-ink` | `#f7e6ea` to `#efd3da`, `#5a0d1c` | `#2b2427` to `#231c1f`, `#ecd7dc` |
 | Accent (active only) | `--accent` | `#f2b134` | `#f2b134` |
 | Text on accent | `--on-accent` | `#5a0d1c` | `#5a0d1c` |
+| Text on a primary button | `--on-primary` | `#ffffff` | `#ffffff` |
+| A dialog's scrim | `--scrim` | black at 45% | black at 45% |
 | Button glow | `--glow` | wine at 35% | `#ff8fa3` at 22% |
 | Card halo | `--halo` | wine at 16% | `#ff8fa3` at 10% |
 | Danger | `--danger` | `#b3261e` | `#ff8a80` |
@@ -260,12 +267,14 @@ means these properties.
 Review the rendered page, not only its source: the rules are about what a person sees.
 
 1. **Render** the page at 360, 720 and 1280 px wide in both themes, headless, and keep the screenshots out
-   of git. `tests/ui/test_look.py` already renders it with Playwright against a box in a network namespace;
-   extend a test there for a screenshot when one is needed.
+   of git. `tests/ui/test_look.py` renders it with Playwright against the real app on a free port with a
+   recording engine: `WANPIRE_SHOTS=<stage> pytest tests/ui/test_look.py -k screenshots` draws every page
+   at the three widths in both themes into `tests/ui/shots/<stage>/`.
 2. **Walk the checklist** in order, section by section of the page, comparing against sections 1 to 14
    above. For each rule, record *pass*, *deviation* or *missing*. A deviation says what the page does, what
    the rule says, and the measured number where a number applies.
-3. **Check the source for the causes that screenshots hide:** a literal colour outside the `:root` blocks;
+3. **Check the source for the causes that screenshots hide** (`tests/unit/test_web_style.py` does, without
+   a browser): a literal colour outside the `:root` blocks;
    a weight of 500 or 600; a shadow on a panel; a font-size other than 13, 14, 16, 20, 22 or 24; a radius
    other than 5, 6, 8, 10 or 50%; a media query that breaks the columns above 720 px; a fetch to any host;
    a value in an example that is not a placeholder.

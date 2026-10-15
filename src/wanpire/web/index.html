@@ -12,6 +12,10 @@
 
 <!-- The first visit makes the box's account; afterwards, signing in with it -->
 <div id="signin-wrap" class="signin-wrap" hidden>
+  <div class="signin-top">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-mark"/></svg>
+    <span class="name">wanpire</span>
+  </div>
   <form id="setup" class="signin" hidden novalidate>
     <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-mark"/></svg>
     <h1>Set up wanpire</h1>
@@ -20,10 +24,16 @@
     <label for="setup-user">User name:</label>
     <input id="setup-user" type="text" autocomplete="username" value="admin" required>
     <label for="setup-password">Password:</label>
-    <input id="setup-password" type="password" autocomplete="new-password" required>
+    <div class="password">
+      <input id="setup-password" type="password" autocomplete="new-password" required>
+      <button type="button" class="eye" aria-controls="setup-password" aria-pressed="false" aria-label="Show the password"><svg class="icon" viewBox="0 0 24 24"><use href="#i-eye"/></svg></button>
+    </div>
     <p class="help">At least 8 characters.</p>
     <label for="setup-again">Password again:</label>
-    <input id="setup-again" type="password" autocomplete="new-password" required>
+    <div class="password">
+      <input id="setup-again" type="password" autocomplete="new-password" required>
+      <button type="button" class="eye" aria-controls="setup-again" aria-pressed="false" aria-label="Show the password"><svg class="icon" viewBox="0 0 24 24"><use href="#i-eye"/></svg></button>
+    </div>
     <button id="setup-save" type="submit" class="primary">Save and sign in</button>
     <p id="setup-error" class="bad" role="alert"></p>
   </form>
@@ -34,7 +44,10 @@
     <label for="user">User name:</label>
     <input id="user" type="text" autocomplete="username" required>
     <label for="password">Password:</label>
-    <input id="password" type="password" autocomplete="current-password" required>
+    <div class="password">
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button type="button" class="eye" aria-controls="password" aria-pressed="false" aria-label="Show the password"><svg class="icon" viewBox="0 0 24 24"><use href="#i-eye"/></svg></button>
+    </div>
     <p class="help">Forgotten? On the box, over SSH: <code>sudo wanpire account set &lt;user&gt;</code>.</p>
     <button id="signin-save" type="submit" class="primary">Sign in</button>
     <p id="signin-error" class="bad" role="alert"></p>
@@ -94,12 +107,12 @@
         <section class="panel">
           <div class="head"><h2>State of the box</h2></div>
           <p class="desc">What the box is doing now, refreshed every few seconds.</p>
-          <dl class="card">
+          <div class="card"><dl class="card-body">
             <div><dt>Mode:</dt><dd id="mode">-</dd></div>
             <div><dt>Link:</dt><dd id="link-state">-</dd></div>
             <div><dt>Held by:</dt><dd id="holder">-</dd></div>
             <div><dt>Queue:</dt><dd id="queue-count">-</dd></div>
-          </dl>
+          </dl></div>
         </section>
 
         <section class="panel">
@@ -112,7 +125,7 @@
               <input id="purpose" type="text" placeholder="what you are testing">
               <p class="help">Shown to everyone waiting for the box.</p>
             </div>
-            <label for="hold">Hold the link:</label>
+            <label for="hold" class="master">Hold the link:</label>
             <div class="control">
               <select id="hold">
                 <option value="until-released" selected>until released</option>
@@ -127,12 +140,15 @@
               <p class="help">A length is kept when you close this page; Release ends it sooner.</p>
             </div>
             <span></span>
-            <div class="control"><button id="ask" type="button" class="primary">Ask for the link</button></div>
+            <div class="control">
+              <button id="ask" type="button" class="primary">Ask for the link</button>
+              <p id="lease-message" class="help under" role="status"></p>
+            </div>
           </div>
         </section>
 
         <section class="panel">
-          <div class="head"><h2>Link</h2><button id="clear" type="button" class="action" disabled>Clear</button></div>
+          <div class="head"><h2>Link</h2><button id="clear" type="button" class="action danger" disabled>Clear</button></div>
           <p class="desc">Describe the link by its two ends: where the device is, and the rest of the network.</p>
           <div class="form">
             <label for="near-endpoint">Near end (the device):</label>
@@ -146,20 +162,26 @@
               <select id="far-channel" aria-label="Far end's channel"></select>
             </div>
           </div>
-          <dl class="card" id="preview">
-            <div><dt>Delay down, ms:</dt><dd id="down-delay_ms">-</dd></div>
-            <div><dt>Delay up, ms:</dt><dd id="up-delay_ms">-</dd></div>
-            <div><dt>Jitter down, ms:</dt><dd id="down-jitter_ms">-</dd></div>
-            <div><dt>Jitter up, ms:</dt><dd id="up-jitter_ms">-</dd></div>
-            <div><dt>Loss down, %:</dt><dd id="down-loss">-</dd></div>
-            <div><dt>Loss up, %:</dt><dd id="up-loss">-</dd></div>
-            <div><dt>Bandwidth down, Mbit/s:</dt><dd id="down-rate_mbit">-</dd></div>
-            <div><dt>Bandwidth up, Mbit/s:</dt><dd id="up-rate_mbit">-</dd></div>
-          </dl>
+          <div class="card two" id="preview">
+            <p class="card-title">Figures each way</p>
+            <dl class="card-body">
+              <div><dt>Delay down, ms:</dt><dd id="down-delay_ms">-</dd></div>
+              <div><dt>Delay up, ms:</dt><dd id="up-delay_ms">-</dd></div>
+              <div><dt>Jitter down, ms:</dt><dd id="down-jitter_ms">-</dd></div>
+              <div><dt>Jitter up, ms:</dt><dd id="up-jitter_ms">-</dd></div>
+              <div><dt>Loss down, %:</dt><dd id="down-loss">-</dd></div>
+              <div><dt>Loss up, %:</dt><dd id="up-loss">-</dd></div>
+              <div><dt>Bandwidth down, Mbit/s:</dt><dd id="down-rate_mbit">-</dd></div>
+              <div><dt>Bandwidth up, Mbit/s:</dt><dd id="up-rate_mbit">-</dd></div>
+            </dl>
+          </div>
           <p id="path" class="help"></p>
           <div class="form">
             <span></span>
-            <div class="control"><button id="apply" type="button" class="primary" disabled>Apply</button></div>
+            <div class="control">
+              <button id="apply" type="button" class="primary" disabled>Apply</button>
+              <p id="link-message" class="help under" role="status"></p>
+            </div>
           </div>
         </section>
       </div>
@@ -169,7 +191,7 @@
         <section class="panel">
           <div class="head"><h2>Traffic</h2></div>
           <p class="desc">What the box has done to the packets since the link was applied. Down is towards the device.</p>
-          <dl class="card" id="counters">
+          <div class="card two" id="counters"><dl class="card-body">
             <div><dt>Packets down:</dt><dd id="c-down-packets">-</dd></div>
             <div><dt>Packets up:</dt><dd id="c-up-packets">-</dd></div>
             <div><dt>Bytes down:</dt><dd id="c-down-bytes">-</dd></div>
@@ -180,7 +202,7 @@
             <div><dt>Dropped by the bandwidth's queue, up:</dt><dd id="c-up-shaper_dropped">-</dd></div>
             <div><dt>Queued now, down:</dt><dd id="c-down-queued">-</dd></div>
             <div><dt>Queued now, up:</dt><dd id="c-up-queued">-</dd></div>
-          </dl>
+          </dl></div>
         </section>
       </div>
 
@@ -196,13 +218,13 @@
       <!-- Broker / Holder and queue -->
       <div class="page" id="page-broker-queue" hidden>
         <section class="panel">
-          <div class="head"><h2>Who is using the box</h2></div>
+          <div class="head"><h2>Who is using the box</h2><button id="end-lease" type="button" class="action danger" hidden>End this lease</button></div>
           <p class="desc">One client drives the link at a time; the others wait in order of arrival.</p>
           <div class="table"><table id="queue">
             <thead><tr><th>Place</th><th>Who</th><th>Purpose</th><th>For</th><th>Remaining</th></tr></thead>
             <tbody></tbody>
           </table></div>
-          <div class="buttons"><button id="end-lease" type="button" class="secondary danger" hidden>End this lease</button></div>
+          <p id="broker-message" class="help" role="status"></p>
         </section>
       </div>
 
@@ -212,7 +234,7 @@
           <div class="head"><h2>Roles</h2></div>
           <p class="desc">The two adapters the line runs through. A Wi-Fi outbound adapter becomes an access point that the device joins, on 5 GHz with WPA2 or WPA3; a Wi-Fi inbound adapter joins a network as a client, in router mode. The roles change only with no link applied and no lease held.</p>
           <form id="roles-form" class="form" novalidate>
-            <label for="role-inbound">Inbound adapter:</label>
+            <label for="role-inbound" class="master">Inbound adapter:</label>
             <div class="control">
               <select id="role-inbound"></select>
               <p class="help">Faces the wider network.</p>
@@ -231,7 +253,7 @@
                 <p id="net-inbound-pass-error" class="help bad" role="alert"></p>
               </div>
             </div>
-            <label for="role-outbound">Outbound adapter:</label>
+            <label for="role-outbound" class="master">Outbound adapter:</label>
             <div class="control">
               <select id="role-outbound"></select>
               <p class="help">Faces the device under test; every impairment lives on it.</p>
@@ -253,7 +275,7 @@
             <span></span>
             <div class="control">
               <button id="roles-save" type="submit" class="primary">Save</button>
-              <p id="roles-message" class="help" role="status"></p>
+              <p id="roles-message" class="help under" role="status"></p>
             </div>
           </form>
         </section>
@@ -273,10 +295,12 @@
         <section class="panel">
           <div class="head"><h2>Access</h2><a class="action" href="docs">API reference</a></div>
           <p class="desc">The box's one account, for people here and for agents through the API and the MCP.</p>
-          <dl class="card">
-            <div><dt>Signed in as:</dt><dd id="me">-</dd></div>
-          </dl>
-          <div class="buttons"><button id="signout" type="button" class="secondary">Sign out</button></div>
+          <div class="form">
+            <span>Signed in as:</span>
+            <span id="me">-</span>
+            <span></span>
+            <div class="control"><button id="signout" type="button" class="primary">Sign out</button></div>
+          </div>
         </section>
 
         <section class="panel">
@@ -284,27 +308,61 @@
           <p class="desc">Every other browser is signed out; agents need the new password too.</p>
           <form id="pw-form" class="form" novalidate>
             <label for="pw-current">Current password:</label>
-            <div class="control"><input id="pw-current" type="password" autocomplete="current-password"></div>
+            <div class="control password">
+              <input id="pw-current" type="password" autocomplete="current-password">
+              <button type="button" class="eye" aria-controls="pw-current" aria-pressed="false" aria-label="Show the password"><svg class="icon" viewBox="0 0 24 24"><use href="#i-eye"/></svg></button>
+            </div>
             <label for="pw-new">New password:</label>
             <div class="control">
-              <input id="pw-new" type="password" autocomplete="new-password">
+              <div class="password">
+                <input id="pw-new" type="password" autocomplete="new-password">
+                <button type="button" class="eye" aria-controls="pw-new" aria-pressed="false" aria-label="Show the password"><svg class="icon" viewBox="0 0 24 24"><use href="#i-eye"/></svg></button>
+              </div>
               <p class="help">At least 8 characters.</p>
             </div>
             <label for="pw-again">New password again:</label>
-            <div class="control"><input id="pw-again" type="password" autocomplete="new-password"></div>
+            <div class="control password">
+              <input id="pw-again" type="password" autocomplete="new-password">
+              <button type="button" class="eye" aria-controls="pw-again" aria-pressed="false" aria-label="Show the password"><svg class="icon" viewBox="0 0 24 24"><use href="#i-eye"/></svg></button>
+            </div>
             <span></span>
             <div class="control">
               <button id="pw-save" type="submit" class="primary">Change</button>
-              <p id="pw-message" class="help" role="status"></p>
+              <p id="pw-message" class="help under" role="status"></p>
             </div>
           </form>
         </section>
       </div>
 
-      <footer>wanpire, an open-source link emulator</footer>
+      <footer>
+        <div class="foot-row">
+          <a class="foot-action" href="https://github.com/ysern/wanpire" rel="noopener"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-branch"/></svg>Source</a>
+        </div>
+      </footer>
     </main>
   </div>
 </div>
+
+<!-- Ending another's lease: the page's own dialog, not the browser's prompt -->
+<dialog id="end-dialog">
+  <form id="end-form" method="dialog" novalidate>
+    <div class="dialog-head">
+      <span>End this lease</span>
+      <button id="end-close" type="button" class="close" aria-label="Close"><svg class="icon" viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="dialog-body">
+      <p class="lead">End the lease of <span id="end-who"></span>? Its link is cleared, and it is told why on its next call.</p>
+      <div class="form">
+        <label for="end-reason">Reason:</label>
+        <div class="control"><input id="end-reason" type="text" placeholder="bench needed"></div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button id="end-cancel" type="button" class="action">Cancel</button>
+      <button id="end-confirm" type="submit" class="primary">End the lease</button>
+    </div>
+  </form>
+</dialog>
 
 <!-- Icons: white line drawings made for wanpire -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -313,6 +371,9 @@
   <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.9.1 5.5 1.6 5.5 4.3"/></symbol>
   <symbol id="i-port" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="13" rx="1.5"/><path d="M8 18v-4h8v4"/><path d="M9.5 9v2M12 9v2M14.5 9v2"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6"/><path d="M18 10.2c0 3.5-3 4.5-6 5.3S6 17 6 16.8"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-mark" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#0e1116"/><circle cx="16" cy="16" r="14.5" fill="none" stroke="#18a8f2" stroke-width="1.5"/><path d="M8 9 L2 13 L8 19 Z M24 9 L30 13 L24 19 Z" fill="#e0202c"/><rect x="7" y="5" width="18" height="18" rx="2" fill="#23914a"/><path d="M8.5 10 L14 12 M23.5 10 L18 12" stroke="#0b0d10" stroke-width="1.5" stroke-linecap="round"/><rect x="9" y="12" width="5" height="4" rx="1" fill="#ffffff"/><rect x="18" y="12" width="5" height="4" rx="1" fill="#ffffff"/><rect x="11" y="13" width="2" height="2" fill="#e0202c"/><rect x="19" y="13" width="2" height="2" fill="#e0202c"/><rect x="10" y="18" width="12" height="3" rx="1" fill="#0b0d10"/><path d="M11 18 L12.5 21.5 L14 18 Z M18 18 L19.5 21.5 L21 18 Z" fill="#ffffff"/><path d="M13 22 V28 M16 22 V29 M19 22 V28" stroke="#18a8f2" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </svg>
 

@@ -60,10 +60,12 @@ function errorOf(res) {
 
 // -- small helpers --------------------------------------------------------------------------
 
-function say(text, kind) {
-  const m = $("message");
+// A result is said where it belongs: under the button that caused it ("lease-message",
+// "link-message", "broker-message"); the line at the top keeps errors reaching the box.
+function say(text, kind, place) {
+  const m = $(place || "message");
   m.textContent = text;
-  m.className = kind || "";
+  m.classList.toggle("bad", kind === "bad");
 }
 
 function num(v) {
@@ -135,7 +137,7 @@ async function loadAdapters() {
   const res = await call("GET", "adapters");
   if (!res.ok) return;
   fillTable("adapters-table", res.data.map((a) => [
-    a.name, a.kind, a.role || "none", a.state || "-", a.speed_mbit ? `${a.speed_mbit} Mbit/s` : "-"]));
+    a.name, a.kind, a.role || "none", a.state || "---", a.speed_mbit ? `${a.speed_mbit} Mbit/s` : "---"]));
 }
 
 // -- the roles: inbound and outbound; a Wi-Fi inbound joins a network, a Wi-Fi outbound is an
@@ -205,7 +207,7 @@ $("roles-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const m = $("roles-message");
   m.textContent = "";
-  m.className = "help";
+  m.classList.remove("bad");
   const body = { inbound: $("role-inbound").value, outbound: $("role-outbound").value,
     access_points: {}, wifi_clients: {} };
   const problems = [];
@@ -236,12 +238,11 @@ $("roles-form").addEventListener("submit", async (ev) => {
     const res = await call("PUT", "roles", body);
     if (res.ok) {
       m.textContent = "The roles are saved and the line is set up with them.";
-      m.className = "help good";
       await loadRoles();
       await loadAdapters();
     } else {
       m.textContent = errorOf(res);
-      m.className = "help bad";
+      m.classList.add("bad");
     }
   } finally {
     $("roles-save").disabled = false;
@@ -324,15 +325,27 @@ $("pw-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const m = $("pw-message");
   const problem = passwordProblem($("pw-new").value, $("pw-again").value);
-  if (problem) { m.textContent = problem; m.className = "help bad"; return; }
+  m.classList.toggle("bad", !!problem);
+  if (problem) { m.textContent = problem; return; }
   // sent without `call`: a refused current password is an answer here, not a lost session
   const res = await send("PUT", "account/password",
     { current: $("pw-current").value, new: $("pw-new").value });
   for (const id of ["pw-current", "pw-new", "pw-again"]) $(id).value = "";
-  if (res.ok) { m.textContent = "The password was changed."; m.className = "help good"; return; }
+  if (res.ok) { m.textContent = "The password was changed."; return; }
   m.textContent = res.status === 401 ? "The current password was refused." : errorOf(res);
-  m.className = "help bad";
+  m.classList.add("bad");
 });
+
+// a password field's eye shows what is typed while it is pressed
+for (const eye of document.querySelectorAll("button.eye")) {
+  eye.addEventListener("click", () => {
+    const input = $(eye.getAttribute("aria-controls"));
+    const shown = input.type === "text";
+    input.type = shown ? "password" : "text";
+    eye.setAttribute("aria-pressed", String(!shown));
+    eye.setAttribute("aria-label", shown ? "Show the password" : "Hide the password");
+  });
+}
 
 async function enter(who) {
   user = who;
@@ -416,7 +429,13 @@ async function refresh() {
     row("holds", b.holder.who, b.holder.purpose, duration(b.holder.held_s), left(b.holder));
   }
   b.queue.forEach((q, i) => row(ordinal(i + 1), q.who, q.purpose, duration(q.waiting_s), asked(q)));
-  if (!rows.children.length) row("", "nobody", "", "", "");
+  if (!rows.children.length) {   // the empty state: one pill, one muted line
+    const td = el("td", "empty", "Nobody is using the box.");
+    td.colSpan = 5;
+    const tr = el("tr");
+    tr.append(td);
+    rows.append(tr);
+  }
 
   $("end-lease").hidden = !b.holder || holds;
   if (b.last_clear_error) say(`The last clear failed: ${b.last_clear_error}`, "bad");
@@ -546,7 +565,7 @@ async function preview() {
   const seq = ++previewSeq;
   const res = await call("POST", "preview", ends());
   if (seq !== previewSeq) return; // a newer choice is on its way
-  if (!res.ok) { say(errorOf(res), "bad"); return; }
+  if (!res.ok) { say(errorOf(res), "bad", "link-message"); return; }
   const { link, account } = res.data;
   for (const dir of ["down", "up"]) {
     const d = link[dir];
@@ -627,7 +646,7 @@ async function pollOnce() {
   const res = await call("POST", "lease/poll", undefined, true);
   if (res.ok) answered(res.data);
   else if (res.status === 410 || res.status === 404) ended(errorOf(res));
-  else say(errorOf(res), "bad");
+  else say(errorOf(res), "bad", "lease-message");
 }
 
 $("ask").addEventListener("click", async () => {
@@ -636,17 +655,17 @@ $("ask").addEventListener("click", async () => {
   const body = { who: `web: ${user}`, purpose };
   if (choice !== "page") body.hold = choice === "until-released" ? choice : Number(choice);
   const res = await call("POST", "lease", body);
-  if (!res.ok) { say(errorOf(res), "bad"); return; }
+  if (!res.ok) { say(errorOf(res), "bad", "lease-message"); return; }
   setTicket(res.data.ticket, choice !== "page");
   answered(res.data);
-  say("");
+  say("", "", "lease-message");
 });
 
 async function change(method, body, done) {
   const res = await call(method, "link", body, true);
-  if (res.ok) { say(done, "good"); refresh().catch(() => {}); return; }
+  if (res.ok) { say(done, "", "link-message"); refresh().catch(() => {}); return; }
   if (res.status === 410 || res.status === 404) ended(errorOf(res));
-  else say(errorOf(res), "bad");
+  else say(errorOf(res), "bad", "link-message");
 }
 
 $("apply").addEventListener("click", () => {
@@ -661,7 +680,8 @@ $("release").addEventListener("click", async () => {
   setTicket(null);
   holds = false;
   showLease();
-  say("Released.");
+  say("Released.", "", "lease-message");
+  say("", "", "link-message");
   refresh().catch(() => {});
 });
 
@@ -677,16 +697,28 @@ window.addEventListener("pagehide", () => {
 
 // -- ending another's lease -----------------------------------------------------------------
 
-$("end-lease").addEventListener("click", async () => {
+// The page's own dialog asks for a confirmation and a reason; cancelling does nothing.
+const endDialog = $("end-dialog");
+
+$("end-lease").addEventListener("click", () => {
   if (!lastHolder) return;
-  const reason = window.prompt(
-    `End the lease of ${lastHolder.who} (${lastHolder.purpose})? Its link is cleared, `
-    + "and it is told why on its next call. Reason:", "");
-  if (reason === null) return; // cancelled
+  $("end-who").textContent = `${lastHolder.who} (${lastHolder.purpose})`;
+  $("end-reason").value = "";
+  endDialog.showModal();
+});
+
+for (const id of ["end-cancel", "end-close"]) {
+  $(id).addEventListener("click", () => endDialog.close());
+}
+
+$("end-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  endDialog.close();
+  const who = lastHolder ? lastHolder.who : "the holder";
   const res = await call("DELETE", "lease/holder",
-    { reason: reason.trim() || "ended by hand at the web page" });
-  if (res.ok) say(`Ended the lease of ${lastHolder.who}.`);
-  else say(errorOf(res), "bad");
+    { reason: $("end-reason").value.trim() || "ended by hand at the web page" });
+  if (res.ok) say(`Ended the lease of ${who}.`, "", "broker-message");
+  else say(errorOf(res), "bad", "broker-message");
   refresh().catch(() => {});
 });
 

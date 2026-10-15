@@ -845,3 +845,29 @@ mode, the on-board port in, the USB Wi-Fi stick out as an access point, country 
 password, Save. wanpire's hostapd came up bridged to the on-board port, and a phone joined with what
 had been typed on the page. The owner's verdict on the page was that it is good, and the box stayed
 as it was saved.
+
+## 2026-10-15 — The page measured against its own rules
+
+The house style had been written down the day before, in the project's own words and with every
+number stated; the page had been built before the numbers were. So the page was reviewed against
+the rules, section by section, from the source and then from screenshots at 360, 720 and 1,280 px
+in both themes (a test now draws them on request, out of git). Forty-one deviations: the band in one
+row instead of two, a white side menu with an inset amber group, boxed lowercase buttons, a white
+message panel at the top of every page, an amber "default" tag that made a third accent, the sign-in
+card on a grey page, and a long tail of heights, paddings and weights a few pixels off.
+
+The fix was a retune, not a rebuild: the colours were already tokens, bar one literal white on the
+button. The band stacks: brand, the link line under the mark in the body font, then the five
+sections spread across the column. The menu sits on the tint, as tall as the content, its open group
+a full-width amber bar. Results are said under the button that caused them; only an error reaching
+the box is said at the top. Ending another's lease asks in the page's own dialog instead of the
+browser's prompt. Password fields got an eye. The footer became what the rule says a footer is: one
+uppercase action under a hairline inside the last panel, "Source", with a branch icon, linking to
+the repository, which the owner asked for.
+
+What holds it there: a static test reads the stylesheet with no browser and refuses a literal colour,
+a weight other than 400 or 700, a size outside the six allowed, a radius outside the five, a shadow on
+a panel or a transition outside 0.2 to 0.3 s; and the look test measures the band's rows and height,
+the menu, the panels' spacing, the buttons, the table rows, the dialog's scrim, and that the accent
+appears on exactly two things on any page. The scroll-and-contrast test runs at 360 px too now, every
+page. The skill gained the four rules the fix needed and lacked.

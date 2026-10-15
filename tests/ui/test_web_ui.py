@@ -328,12 +328,14 @@ def test_ask_apply_clear_release(page):
     expect(page.locator("#lease-state")).to_contain_text("You hold the link")
     expect(page.locator("#holder")).to_contain_text("web: admin")
     page.click("#apply")
-    expect(page.locator("#message")).to_contain_text("Applied")
+    expect(page.locator("#link-message")).to_contain_text("Applied")  # under the button, muted
+    expect(page.locator("#message")).to_be_empty()
+    assert "bad" not in page.locator("#link-message").get_attribute("class")
     applied = [c for c in page.box.engine.calls if c[0] == "apply"]
     assert len(applied) == 1
     assert applied[0][2].down.delay_ms == pytest.approx(98.8)
     page.click("#clear")
-    expect(page.locator("#message")).to_contain_text("Cleared")
+    expect(page.locator("#link-message")).to_contain_text("Cleared")
     page.click("#release")
     expect(page.locator("#lease-state")).to_contain_text("You do not hold the link")
     assert page.box.broker.status()["holder"] is None
@@ -371,8 +373,10 @@ def test_ending_another_lease_cancelled(page):
     sign_in(page)
     expect(page.locator("#holder")).to_contain_text("agent-7")
     page.click("#nav-broker")
-    page.once("dialog", lambda d: d.dismiss())
     page.click("#end-lease")
+    expect(page.locator("#end-dialog")).to_be_visible()
+    page.click("#end-cancel")
+    expect(page.locator("#end-dialog")).to_be_hidden()
     page.wait_for_timeout(300)
     assert page.box.broker.status()["holder"]["who"] == "agent-7"
 
@@ -382,8 +386,12 @@ def test_ending_another_lease_confirmed(page):
     sign_in(page)
     expect(page.locator("#holder")).to_contain_text("agent-7")
     page.click("#nav-broker")
-    page.once("dialog", lambda d: d.accept("bench needed"))
     page.click("#end-lease")
+    expect(page.locator("#end-dialog")).to_be_visible()
+    page.fill("#end-reason", "bench needed")
+    page.click("#end-confirm")
+    expect(page.locator("#end-dialog")).to_be_hidden()
+    expect(page.locator("#broker-message")).to_contain_text("Ended the lease of agent-7")
     expect(page.locator("#holder")).to_have_text("nobody")
     r = httpx.post(page.box.url + "/api/v1/lease/poll",
                    headers={**AUTH, "X-Wanpire-Ticket": ticket})
@@ -421,3 +429,23 @@ def test_dark_mode_follows_the_preference(page):
     dark = page.evaluate("getComputedStyle(document.body).backgroundColor")
     assert light != dark
     assert dark != "rgba(0, 0, 0, 0)"
+
+
+# -- a result is said in the section it belongs to --------------------------------------------
+
+def test_a_refused_link_is_said_under_apply(page):
+    sign_in(page)
+    pick(page)
+    page.fill("#purpose", "a refusal")
+    page.click("#ask")
+    expect(page.locator("#lease-state")).to_contain_text("You hold the link")
+    page.evaluate("""() => {
+      const s = document.getElementById("near-endpoint");
+      s.add(new Option("nowhere", "nowhere")); s.value = "nowhere";
+    }""")
+    page.click("#apply")
+    expect(page.locator("#link-message")).to_contain_text("nowhere")
+    assert "bad" in page.locator("#link-message").get_attribute("class")
+    expect(page.locator("#message")).to_be_empty()
+    assert [c for c in page.box.engine.calls if c[0] == "apply"] == []
+
