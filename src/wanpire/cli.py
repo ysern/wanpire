@@ -7,6 +7,7 @@
     wanpire account set admin        (the box's account; the password on stdin; over SSH on the box)
     wanpire account reset            (remove it: the next visit to the web page makes it again)
     wanpire account show
+    wanpire factory-reset [--yes]    (back to the install state: the roles as installed, no account)
     wanpire mcp --url http://<pi-address>:8080   (the MCP over stdio on a host;
                                                   WANPIRE_USER, WANPIRE_PASSWORD)
     wanpire reset                    (clear every configured outbound adapter; the service's start)
@@ -33,6 +34,7 @@ from .account import Account, InvalidAccount
 from .adapters import list_adapters
 from .config import DEFAULT_PATH, InvalidConfig, load_config
 from .engine import DEFAULT_LIFETIME_S, CommandFailed, Engine, RefusedAdapter, run
+from .factory import FACTORY_PATH, NoFactoryCopy
 from .model import Direction, InvalidLink, Link
 from .presets import InvalidPreset
 
@@ -109,8 +111,10 @@ def _serve(a) -> int:
     engine = make_engine(netns=a.netns, control=[cfg.control])
     broker = Broker(on_clear=lambda: engine.clear(roles.config.outbound[0]))
     account = Account(a.account_file)
+    from . import factory
     app = create_app(engine=engine, broker=broker, config=cfg, account=account,
-                     list_adapters=list_adapters, roles=roles)
+                     list_adapters=list_adapters, roles=roles,
+                     reset=lambda: factory.reset(a.config, a.account_file))
     host = a.host or control_address(cfg.control)
     if not account.exists():
         print(f"wanpire: no account yet: open the web page, http://{host}:{a.port}/, to make "
@@ -141,6 +145,49 @@ def _account(a) -> int:
         print("no account: the next visit to the box's web page makes one")
     else:
         print(account.user or "no account: the next visit to the box's web page makes one")
+    return 0
+
+
+def _system(argv: list[str]) -> int:
+    """A command run for its exit code (systemctl); the tests fake it."""
+    import subprocess
+    return subprocess.run(argv).returncode
+
+
+def _factory_reset(a) -> int:
+    """Back to the install state: the configuration from the factory copy, no account; then
+    the unit restarted when one runs, else the line taken down and set up again here."""
+    from . import factory
+    if not a.yes:
+        print("Reset the box to its install state? The account, the roles and Wi-Fi networks "
+              "set since the install, any link and lease are lost. [yes/N] ", end="",
+              file=sys.stderr, flush=True)
+        if sys.stdin.readline().strip().lower() != "yes":
+            print("wanpire: not reset; nothing changed", file=sys.stderr)
+            return 1
+    try:
+        old = load_config(a.config, None)
+    except InvalidConfig:
+        old = None  # no configuration to take down
+    cfg = factory.reset(a.config, a.account_file, a.factory)
+    print(f"the configuration is the install's again: {cfg.mode} mode, control {cfg.control}, "
+          f"inbound {cfg.inbound}, outbound {cfg.outbound[0]}; the account is removed, the "
+          "next visit to the web page makes it")
+    if _system(["systemctl", "is-active", "--quiet", "wanpire.service"]) == 0:
+        if _system(["systemctl", "restart", "wanpire.service"]) != 0:
+            raise ValueError("wanpire.service did not restart (see systemctl status "
+                             "wanpire.service); the configuration and the account are reset")
+        print("wanpire.service restarted: the line is set up again with the restored roles")
+        return 0
+    modes = make_modes()
+    if old is not None:
+        modes.down(old)
+    cfg, missing = _load_for_the_line(a.config)
+    if missing:
+        print(f"the line waits for {cfg.missing_named(missing)}: not plugged in")
+    else:
+        modes.up(cfg)
+        print("the line is set up again with the restored roles")
     return 0
 
 
@@ -204,6 +251,12 @@ def _parser() -> argparse.ArgumentParser:
     ac.add_argument("action", choices=("set", "reset", "show"))
     ac.add_argument("user", nargs="?", help="for set: the user name")
     ac.add_argument("--file", default=ACCOUNT_PATH)
+    fr = sub.add_parser("factory-reset",
+                        help="back to the install state: the roles as installed, no account")
+    fr.add_argument("--yes", action="store_true", help="do not ask first")
+    fr.add_argument("--config", default=DEFAULT_PATH)
+    fr.add_argument("--account-file", default=ACCOUNT_PATH)
+    fr.add_argument("--factory", default=FACTORY_PATH, help="the install's copy to restore")
     sv.add_argument("--host", help="listen here instead of the control adapter's address")
     sv.add_argument("--port", type=int, default=8080)
     sv.add_argument("--netns", help="the namespace the outbound adapter lives in (test beds)")
@@ -260,6 +313,8 @@ def main(argv: list[str] | None = None) -> int:
             return _mcp(a)
         if a.command == "reset":
             return _reset(a)
+        if a.command == "factory-reset":
+            return _factory_reset(a)
         if a.command == "up":
             return _up(a)
         if a.command == "down":
@@ -284,7 +339,8 @@ def main(argv: list[str] | None = None) -> int:
             engine.clear(a.adapter)
         elif a.command == "show":
             print(json.dumps(engine.read(a.adapter), indent=2))
-    except (InvalidLink, InvalidPreset, InvalidConfig, RefusedAdapter, ValueError) as e:
+    except (InvalidLink, InvalidPreset, InvalidConfig, RefusedAdapter, NoFactoryCopy,
+            ValueError) as e:
         print(f"wanpire: {e}", file=sys.stderr)
         return 2
     except CommandFailed as e:

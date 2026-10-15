@@ -909,3 +909,37 @@ restarted. The log says the line waits for the stick and uvicorn is up on the co
 the setup route answers and the status route asks for the account. Reading the status, and
 plugging the stick in to watch the line come up within a few seconds, is left to the owner at
 the box: this session has no sign-in and no hands. The owner then plugged the stick in, and the line came up on its own, as specified.
+
+## 2026-10-15 — Start over
+
+A box that has been configured, tried and handed on should go back to the state it was in right
+after the install. The parts existed one by one, each over SSH as root: `wanpire account reset`,
+an editor on the configuration, or an uninstall and an install. The owner asked for one "start
+over" (`openspec/changes/reset-the-box-to-its-install-state/`), and the five ways of asking for
+it are O11 in `docs/open-questions.md`: two are built, a command on the box and a section on the
+page; a file on the boot partition waits for the owner's word; a button is not for a project
+that runs on any small Linux box.
+
+The install state is a file: when the install writes the configuration it writes a factory copy
+beside it, root only, and a box installed before the copy existed gets one from what the next
+install finds, which it says. The reset is one function the command and the API share: the copy
+is checked as a configuration (not against the adapters: the box may have others now, and a
+missing one leaves the line waiting), written over the configuration, and the account removed.
+What restarts the box is the caller's. `sudo wanpire factory-reset` asks for a "yes", restores,
+and restarts the unit when one runs, else takes the mode down and up itself. `POST
+/api/v1/factory-reset` wants the word `reset`, refuses while a lease is held, naming the holder,
+answers 202 and leaves a second later with exit code 3, so the unit brings the server back
+through `reset` and `up` with the restored roles; the next visit finds a box with no account.
+The MCP offers no such tool. The page's Settings / Access got a Start over section with a danger
+action and the house style's dialog, its primary disabled until `reset` is typed; after 202 it
+says the box is resetting and polls the set-up route until the box answers, then shows the
+set-up card.
+
+Tests: the install's factory copy on a first install, on an older box, left alone after a change
+from the page and gone with `--purge`, run on the Pi (the install tests are Linux-only); the
+reset function; the command's prompt, `--yes` and both restart paths with a fake `systemctl`;
+the API's 422, 409, 202 and the scheduled exit; the page's dialog, cancel and the whole flow
+against a test box whose reset removes the account. On the Pi the install ran once from the new
+tree and wrote the factory copy, equal to the configuration as the owner had set it. The reset
+from the page is the owner's to press: it signs them out and removes the account, which the
+next visit makes again. The owner pressed it: the set-up card came back.

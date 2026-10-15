@@ -384,6 +384,96 @@ def test_the_control_address_is_read_from_ip(monkeypatch):
     assert seen == [["ip", "-j", "-4", "addr", "show", "dev", "wlan0"]]
 
 
+# -- factory-reset: back to the install state (reset-the-box-to-its-install-state) -----------
+
+FACTORY_DOC = {"schema": "wanpire-config/1", "mode": "bridge",
+               "adapters": {"control": "wlan0", "inbound": "eth0", "outbound": ["eth1"]}}
+USED_DOC = dict(FACTORY_DOC, mode="router", router={"address": "10.5.0.1/24"})
+
+
+@pytest.fixture
+def used_box(monkeypatch, tmp_path):
+    """A box changed since its install (router mode, an account), with its factory copy; the
+    unit's state and the modes are faked."""
+    from wanpire.account import Account
+    (tmp_path / "wanpire.json").write_text(json.dumps(USED_DOC))
+    (tmp_path / "factory.json").write_text(json.dumps(FACTORY_DOC))
+    Account(tmp_path / "account").set("admin", "correct horse")
+    state = {"active": True, "system": [], "modes": []}
+
+    class FakeModes:
+        def up(self, c):
+            state["modes"].append(("up", c.mode))
+
+        def down(self, c):
+            state["modes"].append(("down", c.mode))
+
+    def system(argv):
+        state["system"].append(argv)
+        if argv[:2] == ["systemctl", "is-active"]:
+            return 0 if state["active"] else 3
+        return 0
+
+    monkeypatch.setattr(cli, "list_adapters", lambda: ADAPTERS)
+    monkeypatch.setattr(cli, "make_modes", lambda: FakeModes())
+    monkeypatch.setattr(cli, "_system", system)
+    state["argv"] = ["factory-reset", "--config", str(tmp_path / "wanpire.json"),
+                     "--account-file", str(tmp_path / "account"),
+                     "--factory", str(tmp_path / "factory.json")]
+    state["path"] = tmp_path
+    return state
+
+
+def unchanged(state):
+    from wanpire.account import Account
+    return (json.loads((state["path"] / "wanpire.json").read_text()) == USED_DOC
+            and Account(state["path"] / "account").exists())
+
+
+def test_factory_reset_asks_and_stops_on_anything_but_yes(used_box, monkeypatch, capsys):
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO("no\n"))
+    assert cli.main(used_box["argv"]) == 1
+    assert "install state?" in capsys.readouterr().err
+    assert unchanged(used_box) and used_box["system"] == [] and used_box["modes"] == []
+
+
+def test_factory_reset_with_a_typed_yes(used_box, monkeypatch):
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO("yes\n"))
+    assert cli.main(used_box["argv"]) == 0
+    assert not unchanged(used_box)
+
+
+def test_factory_reset_restarts_the_unit_when_it_runs(used_box, capsys):
+    from wanpire.account import Account
+    assert cli.main(used_box["argv"] + ["--yes"]) == 0
+    assert json.loads((used_box["path"] / "wanpire.json").read_text()) == FACTORY_DOC | {
+        "router": {"address": "10.77.0.1/24"}}
+    assert not Account(used_box["path"] / "account").exists()
+    assert used_box["system"] == [["systemctl", "is-active", "--quiet", "wanpire.service"],
+                                  ["systemctl", "restart", "wanpire.service"]]
+    assert used_box["modes"] == []
+    out = capsys.readouterr().out
+    assert "install's again" in out and "bridge mode" in out and "account is removed" in out
+    assert "restarted" in out
+
+
+def test_factory_reset_without_the_unit_sets_the_line_up_itself(used_box, capsys):
+    used_box["active"] = False
+    assert cli.main(used_box["argv"] + ["--yes"]) == 0
+    assert used_box["system"] == [["systemctl", "is-active", "--quiet", "wanpire.service"]]
+    assert used_box["modes"] == [("down", "router"), ("up", "bridge")]
+    assert "set up again with the restored roles" in capsys.readouterr().out
+
+
+def test_factory_reset_without_a_copy_refuses_and_changes_nothing(used_box, capsys):
+    (used_box["path"] / "factory.json").unlink()
+    assert cli.main(used_box["argv"] + ["--yes"]) == 2
+    assert "run the install again" in capsys.readouterr().err
+    assert unchanged(used_box) and used_box["system"] == []
+
+
 # -- reset: every impairment cleared, at the service's start ----------------------------------
 
 def test_reset_clears_every_outbound_adapter(fake, tmp_path):

@@ -451,6 +451,67 @@ def test_a_refused_link_is_said_under_apply(page):
     assert [c for c in page.box.engine.calls if c[0] == "apply"] == []
 
 
+# -- back to the install state (reset-the-box-to-its-install-state) --------------------------
+
+def open_reset(page):
+    sign_in(page)
+    page.goto(page.box.url + "/#settings")
+    page.click("#factory-reset")
+    expect(page.locator("#reset-dialog")).to_be_visible()
+
+
+def test_the_start_over_section_has_a_danger_action(page):
+    sign_in(page)
+    page.goto(page.box.url + "/#settings")
+    section = page.locator("section:has(#factory-reset)")
+    expect(section.locator("h2")).to_have_text("Start over")
+    expect(section.locator(".desc")).to_contain_text("install")
+    assert style_of(page, "#factory-reset", "color") == token(page, "--danger")
+
+
+def test_the_reset_dialog_cancelled_sends_nothing(page):
+    open_reset(page)
+    page.fill("#reset-word", "reset")
+    page.click("#reset-cancel")
+    expect(page.locator("#reset-dialog")).to_be_hidden()
+    page.wait_for_timeout(300)
+    assert page.box.resets == 0 and page.box.account.exists()
+    expect(page.locator("#me")).to_have_text(USER)
+    expect(page.locator("#reset-message")).to_be_empty()
+
+
+def test_the_primary_is_disabled_until_the_word_is_typed(page):
+    open_reset(page)
+    expect(page.locator("#reset-confirm")).to_be_disabled()
+    page.fill("#reset-word", "rese")
+    expect(page.locator("#reset-confirm")).to_be_disabled()
+    page.fill("#reset-word", "reset")
+    expect(page.locator("#reset-confirm")).to_be_enabled()
+    page.fill("#reset-word", "yes")
+    expect(page.locator("#reset-confirm")).to_be_disabled()
+
+
+def test_reset_from_the_page_ends_on_the_set_up_card(page):
+    open_reset(page)
+    page.fill("#reset-word", "reset")
+    page.click("#reset-confirm")
+    expect(page.locator("#reset-dialog")).to_be_hidden()
+    expect(page.locator("#reset-message")).to_contain_text("Resetting")
+    assert "bad" not in page.locator("#reset-message").get_attribute("class")
+    expect(page.locator("#setup")).to_be_visible(timeout=6000)  # polled every two seconds
+    assert page.box.resets == 1 and not page.box.account.exists()
+
+
+def test_a_reset_refused_by_the_box_is_said_under_the_action(page):
+    agent_asks(page.box, "agent-7", "soak test")
+    open_reset(page)
+    page.fill("#reset-word", "reset")
+    page.click("#reset-confirm")
+    expect(page.locator("#reset-message")).to_contain_text("agent-7")
+    assert "bad" in page.locator("#reset-message").get_attribute("class")
+    assert page.box.resets == 0 and page.box.account.exists()
+
+
 # -- the line down for an adapter that is not plugged in (serve-with-the-line-down) ----------
 
 DOWN_REASON = "outbound adapter wlx1 is not plugged in"

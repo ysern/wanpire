@@ -60,14 +60,14 @@ CONFIG = config_from_dict({"schema": "wanpire-config/1", "mode": "bridge",
                                         "outbound": ["eth1"]}})
 
 
-def make_box(path, with_account=True):
+def make_box(path, with_account=True, **more):
     engine, clock = RecordingEngine(), Clock()
     broker = Broker(clock=clock, on_clear=lambda: engine.clear("eth1"))
     account = Account(path)
     if with_account:
         account.set(USER, PASSWORD)
     app = create_app(engine=engine, broker=broker, config=CONFIG, account=account,
-                     list_adapters=lambda: ADAPTERS, tick_s=None, fail_delay_s=0)
+                     list_adapters=lambda: ADAPTERS, tick_s=None, fail_delay_s=0, **more)
     client = TestClient(app)
     client.engine, client.clock, client.broker, client.account = engine, clock, broker, account
     return client
@@ -536,6 +536,60 @@ def test_fixing_the_roles_while_down_brings_the_line_up(down_box):
     assert r.json()["outbound"] == "eth1" and r.json()["missing"] == []
     assert down_box.roles.modes.calls[-1] == ("up", "eth0", "eth1")
     assert line(down_box) == {"up": True}
+
+
+# -- back to the install state (reset-the-box-to-its-install-state) --------------------------
+
+@pytest.fixture
+def resettable(tmp_path):
+    """A box whose reset and exit are recorded: the reset removes the account, as the real
+    one does, and the exit is a note instead of the process ending."""
+    calls = []
+    c = make_box(tmp_path / "account", reset=lambda: calls.append("reset") or
+                 Account(tmp_path / "account").reset(),
+                 exit=lambda code: calls.append(("exit", code)), exit_delay_s=0.01)
+    c.calls = calls
+    return c
+
+
+def exited(c, within_s=3.0):
+    import time
+    deadline = time.monotonic() + within_s
+    while not any(isinstance(x, tuple) for x in c.calls) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    return [x for x in c.calls if isinstance(x, tuple)]
+
+
+@pytest.mark.parametrize("body", [{}, {"confirm": "yes"}, {"confirm": "RESET"}])
+def test_a_reset_without_the_word_is_422_and_changes_nothing(resettable, body):
+    r = resettable.post("/api/v1/factory-reset", json=body, headers=AUTH)
+    assert r.status_code == 422 and "reset" in r.json()["error"]
+    assert resettable.calls == [] and resettable.account.exists()
+
+
+def test_a_reset_while_a_lease_is_held_is_409_naming_the_holder(resettable):
+    ask(resettable, "A", "soak")
+    r = resettable.post("/api/v1/factory-reset", json={"confirm": "reset"}, headers=AUTH)
+    assert r.status_code == 409 and "A" in r.json()["error"] and "soak" in r.json()["error"]
+    assert resettable.calls == [] and resettable.account.exists()
+
+
+def test_a_reset_is_202_then_the_box_is_new_and_the_server_leaves(resettable):
+    r = resettable.post("/api/v1/factory-reset", json={"confirm": "reset"}, headers=AUTH)
+    assert r.status_code == 202 and r.json() == {"resetting": True}
+    assert resettable.calls[0] == "reset"
+    assert resettable.get("/api/v1/setup").json() == {"needed": True}
+    assert exited(resettable) == [("exit", 3)]
+
+
+def test_a_reset_needs_the_account(resettable):
+    assert resettable.post("/api/v1/factory-reset", json={"confirm": "reset"}).status_code == 401
+    assert resettable.calls == []
+
+
+def test_a_server_without_its_files_says_it_cannot_reset(box):
+    r = box.post("/api/v1/factory-reset", json={"confirm": "reset"}, headers=AUTH)
+    assert r.status_code == 501 and box.account.exists()
 
 
 def test_the_tick_watches_for_the_adapter(tmp_path):

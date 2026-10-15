@@ -252,7 +252,8 @@ def test_uninstall_keeps_the_configuration(box):
     box(*ROLES, "--user", "admin", stdin="correct horse\n")
     box("uninstall")
     left = files(box.root)
-    assert set(left) == {"etc/wanpire/wanpire.json", "etc/wanpire/account"}
+    assert set(left) == {"etc/wanpire/wanpire.json", "etc/wanpire/factory.json",
+                         "etc/wanpire/account"}
     assert not (box.root / "etc/systemd/system/multi-user.target.wants/wanpire.service").exists()
     assert not (box.root / "opt/wanpire").exists()
 
@@ -315,6 +316,53 @@ def test_the_country_added_to_an_installed_box(box):
     box(*ROLES, "--wifi-country", "US")
     cfg = json.loads((box.root / "etc/wanpire/wanpire.json").read_text())
     assert cfg["wifi"] == {"country": "US"} and cfg["adapters"]["outbound"] == ["eth1"]
+
+
+# -- the factory copy: the install's state, for a reset (reset-the-box-to-its-install-state) -
+
+def test_a_first_install_keeps_a_factory_copy(box):
+    box(*ROLES)
+    config = box.root / "etc/wanpire/wanpire.json"
+    factory = box.root / "etc/wanpire/factory.json"
+    assert json.loads(factory.read_text()) == json.loads(config.read_text())
+    assert mode(factory) == 0o600
+
+
+def test_a_box_installed_before_the_copy_existed_gets_one_from_its_configuration(box):
+    box(*ROLES)
+    factory = box.root / "etc/wanpire/factory.json"
+    factory.unlink()
+    before = files(box.root)
+    r = box(*ROLES)
+    assert "factory" in r.stdout and "copied" in r.stdout
+    assert json.loads(factory.read_text()) == json.loads(
+        (box.root / "etc/wanpire/wanpire.json").read_text())
+    assert mode(factory) == 0o600
+    now = files(box.root)
+    del now["etc/wanpire/factory.json"]
+    assert now == before
+
+
+def test_the_factory_copy_is_left_alone_when_the_roles_changed_since(box):
+    box(*ROLES)
+    cfg = box.root / "etc/wanpire/wanpire.json"
+    factory = box.root / "etc/wanpire/factory.json"
+    first = factory.read_bytes()
+    saved = json.loads(cfg.read_text())
+    saved["adapters"]["outbound"] = ["wlan1"]
+    saved["access_points"] = {"wlan1": {"ssid": "lab-ap", "passphrase": "correct horse"}}
+    saved["wifi"] = {"country": "GB"}
+    cfg.write_text(json.dumps(saved))
+    box()  # run again, no roles given: it keeps what it finds
+    assert factory.read_bytes() == first
+    assert json.loads(cfg.read_text()) == saved
+
+
+def test_uninstall_purge_removes_the_factory_copy(box):
+    box(*ROLES)
+    assert (box.root / "etc/wanpire/factory.json").exists()
+    box("uninstall", "--purge")
+    assert files(box.root) == {}
 
 
 def test_a_country_that_is_not_one_is_refused(box):

@@ -335,6 +335,12 @@
             </div>
           </form>
         </section>
+
+        <section class="panel">
+          <div class="head"><h2>Start over</h2><button id="factory-reset" type="button" class="action danger">Reset the box…</button></div>
+          <p class="desc">Back to the box's install state: the roles as installed, and no account until the next visit makes one. The roles and Wi-Fi networks set since the install, any link and lease are lost; the install itself stays.</p>
+          <p id="reset-message" class="help" role="status"></p>
+        </section>
       </div>
 
       <footer>
@@ -363,6 +369,27 @@
     <div class="dialog-actions">
       <button id="end-cancel" type="button" class="action">Cancel</button>
       <button id="end-confirm" type="submit" class="primary">End the lease</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Back to the install state: the page's own dialog, the word typed first -->
+<dialog id="reset-dialog">
+  <form id="reset-form" method="dialog" novalidate>
+    <div class="dialog-head">
+      <span>Reset the box to its install state</span>
+      <button id="reset-close" type="button" class="close" aria-label="Close"><svg class="icon" viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="dialog-body">
+      <p class="lead">The account, the roles and Wi-Fi networks set since the install, and any link and lease are lost. The box comes back as it was installed, and the next visit makes its account.</p>
+      <div class="form">
+        <label for="reset-word">Type <code>reset</code>:</label>
+        <div class="control"><input id="reset-word" type="text" autocomplete="off" spellcheck="false"></div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button id="reset-cancel" type="button" class="action">Cancel</button>
+      <button id="reset-confirm" type="submit" class="primary" disabled>Reset the box</button>
     </div>
   </form>
 </dialog>

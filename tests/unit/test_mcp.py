@@ -128,6 +128,7 @@ def test_the_tools_listed(box):
     names = run(go())
     assert names == TOOLS
     assert not any("end_" in n or "holder" in n for n in names)
+    assert not any("reset" in n or "factory" in n for n in names)  # a person's decision, A43
 
 
 def test_status(box):

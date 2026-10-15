@@ -108,6 +108,7 @@ P() { printf '%s%s' "$ROOT" "$1"; }  # a path on the box, under the staging root
 VENV_DIR=/opt/wanpire/venv
 WANPIRE=$VENV_DIR/bin/wanpire
 CONFIG=/etc/wanpire/wanpire.json
+FACTORY=/etc/wanpire/factory.json  # the configuration as installed: what `wanpire factory-reset` restores
 ACCOUNT=/etc/wanpire/account
 OLD_TOKEN=/etc/wanpire/token  # the first version's; nothing reads it any more
 NETPLAN=/etc/netplan/60-wanpire.yaml
@@ -375,8 +376,14 @@ if [ -f "$(P "$CONFIG")" ]; then
     else
         step config "unchanged: $CONFIG"
     fi
+    # a box installed before the factory copy existed: its install state is what it has now
+    if [ ! -f "$(P "$FACTORY")" ]; then
+        write_file "$FACTORY" 600 factory < "$(P "$CONFIG")" && \
+            step factory "copied from $CONFIG: the box's install state, which 'wanpire factory-reset' restores"
+    fi
 else
     config_json | write_file "$CONFIG" 600 config || true
+    config_json | write_file "$FACTORY" 600 factory || true
 fi
 [ -n "$WIFI_COUNTRY" ] || \
     step wifi "no regulatory country: an access point needs one (--wifi-country CC, or wifi.country in $CONFIG)"

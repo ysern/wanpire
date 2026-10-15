@@ -36,6 +36,17 @@ ssh <pi-address> sudo wanpire account reset       # or none: the next visit make
 
 The running server takes the change at once; no restart.
 
+To start over, back to the state right after the install (the roles as installed, no account,
+no Wi-Fi networks or passwords, nothing applied; the install itself stays):
+
+```sh
+ssh <pi-address> sudo wanpire factory-reset         # asks "yes"; --yes does not
+```
+
+or, signed in, Settings / Access / Start over on the page, which asks for the word `reset`.
+The box restarts its server and the next visit makes the account again (the change
+`reset-the-box-to-its-install-state` under `openspec/changes/`).
+
 The reference build is a Raspberry Pi 4 with Ubuntu Server 24.04 LTS, its on-board
 Ethernet port as the link in and a USB 3 gigabit Ethernet adapter as the link out,
 controlled over its Wi-Fi. Any Debian-like Linux box with two Ethernet ports should do.

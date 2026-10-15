@@ -99,9 +99,11 @@ class Box:
         self.account = Account(Path(tempfile.mkdtemp()) / "account")
         if with_account:
             self.account.set(USER, PASSWORD)
+        self.resets = 0  # the factory reset here removes the account; the "exit" is a no-op
         app = create_app(engine=self.engine, broker=self.broker, config=config,
                          account=self.account, list_adapters=lambda: self.adapters,
-                         tick_s=None, fail_delay_s=0, roles=self.roles)
+                         tick_s=None, fail_delay_s=0, roles=self.roles,
+                         reset=self._reset, exit=lambda code: None, exit_delay_s=0.01)
         with socket.socket() as s:
             s.bind(("127.0.0.1", 0))
             self.port = s.getsockname()[1]
@@ -109,6 +111,10 @@ class Box:
         self.server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=self.port,
                                                     log_level="warning"))
         self.thread = threading.Thread(target=self.server.run, daemon=True)
+
+    def _reset(self):
+        self.resets += 1
+        self.account.reset()
 
     def start(self):
         self.thread.start()

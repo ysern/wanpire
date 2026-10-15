@@ -28,6 +28,8 @@ broker's lease, shown by its ticket in ``X-Wanpire-Ticket``; reading needs no ti
                                      picked, and which configured adapter is unplugged
     PUT    /api/v1/roles             {"inbound", "outbound", "access_points", "wifi_clients"}:
                                      set them (idle line; allowed with the line down)
+    POST   /api/v1/factory-reset     {"confirm": "reset"}: back to the install state, then the
+                                     server restarts (no lease held; not offered by the MCP)
     POST   /mcp                      the MCP (streamable HTTP), its tools calling the routes above
 
 The web UI's static files are served at ``/`` without credentials: they hold no data, and the
@@ -40,6 +42,7 @@ import asyncio
 import base64
 import binascii
 import contextlib
+import os
 import secrets
 import threading
 import time
@@ -55,6 +58,7 @@ from .account import Account, InvalidAccount, check
 from .broker import Broker, InvalidHold, LeaseEnded, NotHolder, UnknownTicket
 from .config import Config, InvalidConfig
 from .engine import CommandFailed, RefusedAdapter
+from .factory import NoFactoryCopy
 from .modes import ModeRefused
 from .model import InvalidLink, Link
 from .presets import InvalidPreset
@@ -119,7 +123,11 @@ class _Guard:
 
 def create_app(engine, broker: Broker, config: Config, account: Account, list_adapters,
                tick_s: float | None = 5.0, with_mcp: bool = True,
-               fail_delay_s: float = 0.5, roles: Roles | None = None) -> FastAPI:
+               fail_delay_s: float = 0.5, roles: Roles | None = None,
+               reset=None, exit=os._exit, exit_delay_s: float = 1.0) -> FastAPI:
+    """``reset``: a callable that puts the box back to its install state (``factory.reset``
+    with the server's paths); none, and the route says so. After it the server leaves by
+    ``exit(3)``, ``exit_delay_s`` after answering, for the unit to start it again."""
     roles = roles or Roles(config, list_adapters)  # without modes and a file: read only
 
     def outbound_now() -> str:  # the outbound adapter now: the roles may change while the server runs
@@ -198,7 +206,7 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
     for exc, code in ((UnknownTicket, 404), (NotHolder, 409), (LeaseEnded, 410),
                       (InvalidLink, 422), (InvalidPreset, 422), (InvalidConfig, 422),
                       (RefusedAdapter, 422), (CommandFailed, 500), (InvalidAccount, 422),
-                      (InvalidHold, 422), (ModeRefused, 500)):
+                      (InvalidHold, 422), (ModeRefused, 500), (NoFactoryCopy, 409)):
         def handler(_r: Request, e: Exception, code=code):
             return error(code, str(e))
         app.add_exception_handler(exc, handler)
@@ -412,6 +420,26 @@ def create_app(engine, broker: Broker, config: Config, account: Account, list_ad
                      clients)
         described[0] = None
         return roles.view()
+
+    # -- back to the install state ----------------------------------------------------------
+
+    @app.post(f"{api}/factory-reset", dependencies=auth, status_code=202)
+    def factory_reset(body: dict = Body(default={})):
+        if (body or {}).get("confirm") != "reset":
+            raise _Status(422, 'the word "reset" is needed, {"confirm": "reset"}: it puts the '
+                               "box back to its install state; nothing was changed")
+        holder = broker.status()["holder"]
+        if holder is not None:
+            raise _Status(409, f"the box resets only with no lease held: {holder['who']} holds "
+                               f"it for {holder['purpose']}; release it first")
+        if reset is None:
+            raise _Status(501, "this server cannot reset the box: it was started without its "
+                               "files (a test bed)")
+        reset()  # the configuration restored, the account gone: the next request finds a new box
+        # the restart is the unit's: leave once the answer is out, and `Restart=on-failure`
+        # brings the server back through `reset` and `up` with the restored roles
+        threading.Timer(exit_delay_s, lambda: exit(3)).start()
+        return {"resetting": True}
 
     # the MCP: a client of the routes above, through the app itself (no socket)
     if with_mcp:

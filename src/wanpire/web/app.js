@@ -769,6 +769,50 @@ $("end-form").addEventListener("submit", async (ev) => {
   refresh().catch(() => {});
 });
 
+// -- back to the install state --------------------------------------------------------------
+
+// The page's own dialog, its primary disabled until the word is typed. On 202 the box has no
+// account any more and the server is leaving for the unit to start it again: the page says
+// so, stops refreshing (a refresh would find no account) and polls the set-up route until the
+// box answers, then shows the set-up card.
+const resetDialog = $("reset-dialog");
+
+$("factory-reset").addEventListener("click", () => {
+  $("reset-word").value = "";
+  $("reset-confirm").disabled = true;
+  resetDialog.showModal();
+});
+
+$("reset-word").addEventListener("input", () => {
+  $("reset-confirm").disabled = $("reset-word").value.trim() !== "reset";
+});
+
+for (const id of ["reset-cancel", "reset-close"]) {
+  $(id).addEventListener("click", () => resetDialog.close());
+}
+
+async function waitForTheNewBox() {
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const setup = await send("GET", "setup");
+      if (setup.ok && setup.data.needed) { showSetup(); return; }
+    } catch { /* the box is restarting: ask again */ }
+  }
+}
+
+$("reset-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  if ($("reset-word").value.trim() !== "reset") return;
+  resetDialog.close();
+  const res = await call("POST", "factory-reset", { confirm: "reset" });
+  if (!res.ok) { say(errorOf(res), "bad", "reset-message"); return; }
+  say("Resetting; the page comes back when the box answers.", "", "reset-message");
+  clearInterval(statusTimer);
+  statusTimer = null;
+  waitForTheNewBox();
+});
+
 // -- start ----------------------------------------------------------------------------------
 
 async function start() {
